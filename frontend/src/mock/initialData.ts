@@ -1,0 +1,311 @@
+import type { Cultivar, CropBatch, Reservoir, NutrientFormula, Alert, HarvestRecord } from '../types/farm';
+
+export const INITIAL_CULTIVARS: Cultivar[] = [
+  {
+    id: 'cult-01',
+    cropName: 'Xà lách (Lettuce)',
+    name: 'Green Oak Leaf',
+    scientificName: 'Lactuca sativa var. crispa',
+    description: 'Xà lách lá sồi xanh, tán xòe đẹp, thích hợp hệ thống NFT, chu kỳ ngắn, năng suất cao.',
+    targetCycleDays: 35,
+    expectedWeightG: 190,
+    recommendedPhMin: 5.6,
+    recommendedPhMax: 6.2,
+    recommendedEcMin: 1.4,
+    recommendedEcMax: 1.9,
+    minDo: 6.0,
+    optimalWaterTempMin: 20.0,
+    optimalWaterTempMax: 24.0,
+  },
+  {
+    id: 'cult-02',
+    cropName: 'Xà lách (Lettuce)',
+    name: 'Batavia Lettuce',
+    scientificName: 'Lactuca sativa var. capitata',
+    description: 'Xà lách cuộn giòn, chịu nhiệt tốt, thích hợp hệ thống máng tuần hoàn NFT, dataset nghiên cứu Mendeley 2025.',
+    targetCycleDays: 36,
+    expectedWeightG: 205,
+    recommendedPhMin: 5.8,
+    recommendedPhMax: 6.3,
+    recommendedEcMin: 1.5,
+    recommendedEcMax: 2.0,
+    minDo: 6.2,
+    optimalWaterTempMin: 21.0,
+    optimalWaterTempMax: 25.0,
+  },
+  {
+    id: 'cult-03',
+    cropName: 'Xà lách (Lettuce)',
+    name: 'Romaine (Cos)',
+    scientificName: 'Lactuca sativa var. longifolia',
+    description: 'Xà lách La Mã thân đứng, lá dày nhiều dinh dưỡng, thích hợp máng hồi lưu NFT.',
+    targetCycleDays: 38,
+    expectedWeightG: 230,
+    recommendedPhMin: 5.5,
+    recommendedPhMax: 6.0,
+    recommendedEcMin: 1.6,
+    recommendedEcMax: 2.1,
+    minDo: 6.5,
+    optimalWaterTempMin: 19.0,
+    optimalWaterTempMax: 23.5,
+  }
+];
+
+export const INITIAL_RESERVOIRS: Reservoir[] = [
+  {
+    id: 'res-01',
+    name: 'Bể Tuần Hoàn 01 - Giàn NFT Tầng 1',
+    systemType: 'NFT',
+    capacityLiters: 600,
+    currentVolumeLiters: 540,
+    currentPh: 5.85,
+    currentEc: 1.72,
+    currentDo: 6.75,
+    currentWaterTemp: 22.4,
+    formulaName: 'Chuẩn Hoagland - Resh Xà Lách Thủy Canh (NFT Sinh Trưởng)',
+    lastTopUpDate: '2026-09-09',
+    lastReplacementDate: '2026-08-25',
+    pumpStatus: 'running',
+    aerationStatus: 'active'
+  },
+  {
+    id: 'res-02',
+    name: 'Bể Tuần Hoàn 02 - Giàn NFT Tầng 2',
+    systemType: 'NFT',
+    capacityLiters: 1000,
+    currentVolumeLiters: 920,
+    currentPh: 6.02,
+    currentEc: 1.84,
+    currentDo: 7.20,
+    currentWaterTemp: 21.8,
+    formulaName: 'Chuẩn Hoagland - Resh Xà Lách Thủy Canh (NFT Sinh Trưởng)',
+    lastTopUpDate: '2026-09-08',
+    lastReplacementDate: '2026-08-20',
+    pumpStatus: 'running',
+    aerationStatus: 'active'
+  }
+];
+
+export const INITIAL_FORMULAS: NutrientFormula[] = [
+  {
+    id: 'form-01',
+    name: 'Chuẩn Hoagland - Resh Xà Lách Thủy Canh (NFT Sinh Trưởng)',
+    applicableCrop: 'Xà lách mỡ, Oak Leaf, Lollo Bionda, Batavia',
+    systemType: 'Hệ thống màng dinh dưỡng NFT',
+    scientificStandard: 'Chuẩn quốc tế Hoagland & Resh (2012) cải tiến bởi ĐH Cornell cho rau xà lách',
+    targetEc: 1.68,
+    targetPh: 5.85,
+    dosingRatio: '1:100 (10 ml Stock A + 10 ml Stock B trên 1 Lít nước sạch -> tăng ~1.65 mS/cm)',
+    chemicalIncompatibilityReason: 'Tuyệt đối không pha chung Stock A và B ở dạng đậm đặc vì ion Ca²⁺ phản ứng với SO₄²⁻ và PO₄³⁻ tạo kết tủa trắng CaSO₄ (thạch cao) và Ca₃(PO₄)₂, làm tắc máng NFT và rễ cây thiếu Canxi gây cháy mép lá (tipburn).',
+    stockADetails: 'Canxi Nitrat [Ca(NO3)2·4H2O]: 1,000g, Kali Nitrat [KNO3]: 200g, Sắt Chelate [Fe-EDDHA 6%]: 40g (cho 10L dung dịch mẹ)',
+    stockBDetails: 'MKP [KH2PO4]: 250g, Kali Nitrat [KNO3]: 400g, Magie Sulfat [MgSO4·7H2O]: 550g, Kali Sulfat [K2SO4]: 100g, Vi lượng Chelate: 25g (cho 10L dung dịch mẹ)',
+    stockAItems: [
+      { name: 'Canxi Nitrat Tinh Khiết', chemicalFormula: 'Ca(NO3)2·4H2O', gramsPer10LStock: 1000, primaryNutrients: 'Ca (165 ppm), N-NO3 (118 ppm)', grade: 'YaraLiva Calcinit (Hòa tan 100%)' },
+      { name: 'Kali Nitrat Bổ Sung', chemicalFormula: 'KNO3', gramsPer10LStock: 200, primaryNutrients: 'K (77 ppm), N-NO3 (26 ppm)', grade: 'Haifa Multi-K' },
+      { name: 'Sắt Chelate Hữu Cơ Bền Vững', chemicalFormula: 'Fe-EDDHA (6% Fe)', gramsPer10LStock: 40, primaryNutrients: 'Fe (2.4 - 3.0 ppm)', grade: 'AkzoNobel Dissolvine' }
+    ],
+    stockBItems: [
+      { name: 'Monopotassium Phosphate (MKP)', chemicalFormula: 'KH2PO4', gramsPer10LStock: 250, primaryNutrients: 'P (56 ppm), K (71 ppm)', grade: 'Haifa MKP 0-52-34' },
+      { name: 'Kali Nitrat Chính', chemicalFormula: 'KNO3', gramsPer10LStock: 400, primaryNutrients: 'K (154 ppm), N-NO3 (52 ppm)', grade: 'Haifa Multi-K 13-0-46' },
+      { name: 'Magie Sulfat Heptahydrate (Muối Epsom)', chemicalFormula: 'MgSO4·7H2O', gramsPer10LStock: 550, primaryNutrients: 'Mg (54 ppm), S (71 ppm)', grade: 'Nông nghiệp tinh khiết 99.5%' },
+      { name: 'Kali Sulfat Bổ Sung Lưu Huỳnh', chemicalFormula: 'K2SO4', gramsPer10LStock: 100, primaryNutrients: 'K (45 ppm), S (18 ppm)', grade: 'SOP Soluble' },
+      { name: 'Tổ Hợp Vi Lượng Chelate Tổng Hợp', chemicalFormula: 'B, Mn-EDTA, Zn-EDTA, Cu-EDTA, Mo', gramsPer10LStock: 25, primaryNutrients: 'B (0.4), Mn (0.4), Zn (0.15), Cu (0.05), Mo (0.03) ppm', grade: 'Tenso Cocktail / Rexolin' }
+    ],
+    targetPpm: { n: 165, p: 48, k: 210, ca: 165, mg: 48, s: 65, fe: 3.0 },
+    notes: 'Duy trì EC 1.6 - 1.8 mS/cm và pH 5.6 - 6.0 trong suốt giai đoạn phát triển sinh khối của xà lách NFT.'
+  },
+  {
+    id: 'form-02',
+    name: 'Công Thức Cornell Chống Cháy Mép Lá (NFT Mùa Nắng)',
+    applicableCrop: 'Xà lách Romaine, Batavia, Xà lách xoăn mùa nóng',
+    systemType: 'Hệ thống màng dinh dưỡng NFT',
+    scientificStandard: 'Cornell CEA Hydroponic Lettuce Standard for Warm Season',
+    targetEc: 1.48,
+    targetPh: 5.90,
+    dosingRatio: '1:115 (8.5 ml Stock A + 8.5 ml Stock B trên 1 Lít nước sạch -> tăng ~1.40 mS/cm)',
+    chemicalIncompatibilityReason: 'Bắt buộc cách ly ion Ca²⁺ với SO₄²⁻ và PO₄³⁻ để ngăn kết tủa Canxi Sunfat và Canxi Photphat trong bình mẹ đậm đặc.',
+    stockADetails: 'Canxi Nitrat: 1,100g (tăng 10% Ca chống tipburn), Kali Nitrat: 150g, Fe-DTPA 7%: 40g (cho 10L dung dịch mẹ)',
+    stockBDetails: 'MKP: 220g, Kali Nitrat: 350g, Magie Sulfat: 600g, Kali Sulfat: 80g, Vi lượng Chelate: 25g (cho 10L dung dịch mẹ)',
+    stockAItems: [
+      { name: 'Canxi Nitrat Tăng Cường', chemicalFormula: 'Ca(NO3)2·4H2O', gramsPer10LStock: 1100, primaryNutrients: 'Ca (180 ppm), N-NO3 (130 ppm)', grade: 'YaraLiva Calcinit' },
+      { name: 'Kali Nitrat', chemicalFormula: 'KNO3', gramsPer10LStock: 150, primaryNutrients: 'K (58 ppm), N-NO3 (20 ppm)', grade: 'Haifa Multi-K' },
+      { name: 'Sắt Chelate Fe-DTPA (7%)', chemicalFormula: 'Fe-DTPA', gramsPer10LStock: 40, primaryNutrients: 'Fe (2.8 ppm)', grade: 'Dissolvine D-Fe-7' }
+    ],
+    stockBItems: [
+      { name: 'Monopotassium Phosphate (MKP)', chemicalFormula: 'KH2PO4', gramsPer10LStock: 220, primaryNutrients: 'P (50 ppm), K (62 ppm)', grade: 'Haifa MKP' },
+      { name: 'Kali Nitrat', chemicalFormula: 'KNO3', gramsPer10LStock: 350, primaryNutrients: 'K (135 ppm), N-NO3 (45 ppm)', grade: 'Haifa Multi-K' },
+      { name: 'Magie Sulfat', chemicalFormula: 'MgSO4·7H2O', gramsPer10LStock: 600, primaryNutrients: 'Mg (58 ppm), S (78 ppm)', grade: 'Epsom Salt' },
+      { name: 'Kali Sulfat', chemicalFormula: 'K2SO4', gramsPer10LStock: 80, primaryNutrients: 'K (36 ppm), S (15 ppm)', grade: 'SOP' },
+      { name: 'Tổ Hợp Vi Lượng', chemicalFormula: 'B, Mn, Zn, Cu, Mo', gramsPer10LStock: 25, primaryNutrients: 'Micro Chelate', grade: 'Rexolin Q48' }
+    ],
+    targetPpm: { n: 145, p: 42, k: 185, ca: 180, mg: 52, s: 70, fe: 2.8 },
+    notes: 'Hạ thấp EC xuống 1.4 - 1.5 mS/cm và tăng tỷ lệ Ca/K giúp tế bào rễ và mô lá hút nước dồi dào, ngăn chặn triệt để hiện tượng cháy mép lá non (tipburn) khi nhiệt độ nước vượt 24°C.'
+  }
+];
+
+export const INITIAL_BATCHES: CropBatch[] = [
+  {
+    id: 'batch-01',
+    batchCode: 'LET-2026-001',
+    cultivarId: 'cult-01',
+    cultivarName: 'Green Oak Leaf',
+    cropName: 'Xà lách',
+    systemType: 'NFT',
+    reservoirId: 'res-01',
+    reservoirName: 'Bể Tuần Hoàn 01 (NFT)',
+    plantQuantity: 650,
+    currentQuantity: 642,
+    seedDate: '2026-08-15',
+    transplantDate: '2026-08-27',
+    expectedHarvestDate: '2026-09-19',
+    currentStage: 'vegetative',
+    status: 'active',
+    densityPlantsPerM2: 26,
+    notes: 'Máng NFT tầng 2, tốc độ sinh trưởng đồng đều, rễ trắng khỏe.',
+    lastObservation: {
+      date: '2026-09-08',
+      avgLeafCount: 16,
+      avgHeightCm: 15.2,
+      sampleWeightG: 142.5
+    }
+  },
+  {
+    id: 'batch-02',
+    batchCode: 'LET-2026-002',
+    cultivarId: 'cult-02',
+    cultivarName: 'Batavia Lettuce',
+    cropName: 'Xà lách',
+    systemType: 'NFT',
+    reservoirId: 'res-01',
+    reservoirName: 'Bể Tuần Hoàn 01 (NFT)',
+    plantQuantity: 500,
+    currentQuantity: 495,
+    seedDate: '2026-08-28',
+    transplantDate: '2026-09-08',
+    expectedHarvestDate: '2026-10-02',
+    currentStage: 'seedling',
+    status: 'active',
+    densityPlantsPerM2: 24,
+    notes: 'Mới chuyển máng NFT 2 ngày, bén rễ tốt, bắt đầu bung lá thật thứ 3.',
+    lastObservation: {
+      date: '2026-09-09',
+      avgLeafCount: 6,
+      avgHeightCm: 6.8,
+      sampleWeightG: 34.0
+    }
+  },
+  {
+    id: 'batch-03',
+    batchCode: 'LET-2026-003',
+    cultivarId: 'cult-03',
+    cultivarName: 'Romaine (Cos)',
+    cropName: 'Xà lách',
+    systemType: 'NFT',
+    reservoirId: 'res-02',
+    reservoirName: 'Bể Tuần Hoàn 02 (NFT)',
+    plantQuantity: 800,
+    currentQuantity: 785,
+    seedDate: '2026-08-04',
+    transplantDate: '2026-08-16',
+    expectedHarvestDate: '2026-09-12',
+    currentStage: 'pre_harvest',
+    status: 'active',
+    densityPlantsPerM2: 22,
+    notes: 'Giai đoạn cuối trước thu hoạch. Cây cuộn búp chắc, lá xanh bóng.',
+    lastObservation: {
+      date: '2026-09-09',
+      avgLeafCount: 24,
+      avgHeightCm: 22.4,
+      sampleWeightG: 228.0
+    }
+  }
+];
+
+// 7 days time series records for charting
+export const INITIAL_SENSOR_HISTORY = [
+  { day: '04/09', time: '08:00', ph: 5.75, ec: 1.62, doLevel: 6.9, waterTemp: 22.0, airTemp: 26.5, humidity: 68, vpd: 1.08 },
+  { day: '04/09', time: '14:00', ph: 5.82, ec: 1.68, doLevel: 6.6, waterTemp: 23.2, airTemp: 29.8, humidity: 62, vpd: 1.58 },
+  { day: '05/09', time: '08:00', ph: 5.80, ec: 1.66, doLevel: 6.8, waterTemp: 22.1, airTemp: 26.0, humidity: 70, vpd: 1.01 },
+  { day: '05/09', time: '14:00', ph: 5.91, ec: 1.74, doLevel: 6.5, waterTemp: 23.5, airTemp: 30.2, humidity: 60, vpd: 1.71 },
+  { day: '06/09', time: '08:00', ph: 5.85, ec: 1.70, doLevel: 6.7, waterTemp: 22.3, airTemp: 26.8, humidity: 67, vpd: 1.16 },
+  { day: '06/09', time: '14:00', ph: 5.98, ec: 1.82, doLevel: 6.4, waterTemp: 23.8, airTemp: 30.8, humidity: 58, vpd: 1.87 },
+  { day: '07/09', time: '08:00', ph: 5.88, ec: 1.75, doLevel: 6.6, waterTemp: 22.2, airTemp: 26.2, humidity: 69, vpd: 1.05 },
+  { day: '07/09', time: '14:00', ph: 6.02, ec: 1.88, doLevel: 6.3, waterTemp: 24.1, airTemp: 31.0, humidity: 59, vpd: 1.84 },
+  { day: '08/09', time: '08:00', ph: 5.84, ec: 1.72, doLevel: 6.8, waterTemp: 22.0, airTemp: 25.8, humidity: 71, vpd: 0.96 },
+  { day: '08/09', time: '14:00', ph: 5.90, ec: 1.76, doLevel: 6.6, waterTemp: 23.0, airTemp: 29.5, humidity: 64, vpd: 1.48 },
+  { day: '09/09', time: '08:00', ph: 5.82, ec: 1.69, doLevel: 6.8, waterTemp: 22.2, airTemp: 26.0, humidity: 70, vpd: 1.01 },
+  { day: '09/09', time: '14:00', ph: 5.89, ec: 1.74, doLevel: 6.7, waterTemp: 22.8, airTemp: 29.0, humidity: 65, vpd: 1.40 },
+  { day: '10/09', time: '08:00', ph: 5.85, ec: 1.72, doLevel: 6.75, waterTemp: 22.4, airTemp: 26.4, humidity: 68, vpd: 1.10 }
+];
+
+export const INITIAL_ALERTS: Alert[] = [
+  {
+    id: 'alt-01',
+    timestamp: '2026-09-10 10:15',
+    severity: 'warning',
+    metric: 'EC',
+    title: 'EC Bể A tăng nhẹ qua trưa (1.88 mS/cm)',
+    message: 'Nồng độ ion hòa tan cao hơn ngưỡng khuyến nghị cho xà lách giai đoạn Seedling (1.5 - 1.8 mS/cm). Cây non có thể bị cháy chóp rễ.',
+    reservoirId: 'res-01',
+    resolved: false,
+    suggestedAction: 'Châm thêm 40L nước RO/nước sạch để hạ EC về mức 1.70 mS/cm.'
+  },
+  {
+    id: 'alt-02',
+    timestamp: '2026-09-09 14:30',
+    severity: 'info',
+    metric: 'System',
+    title: 'Lô LET-2026-003 sẵn sàng thu hoạch trong 48-72h',
+    message: 'Xà lách Romaine đạt ngày thứ 34. Dự báo AI đạt 228g/cây, khuyến nghị chuẩn bị thu hoạch sớm để tránh trổ ngồng hoặc vị đắng.',
+    batchId: 'batch-03',
+    resolved: false,
+    suggestedAction: 'Kiểm tra độ giòn lá và lên lịch trình thu hoạch buổi sáng sớm (6:00 - 8:00 AM).'
+  },
+  {
+    id: 'alt-03',
+    timestamp: '2026-09-07 15:45',
+    severity: 'critical',
+    metric: 'DO',
+    title: 'DO Bể A giảm xuống 5.4 mg/L lúc trời nóng',
+    message: 'Nhiệt độ nước vượt 24.5°C làm giảm độ hòa tan của oxy trong nước. Nguy cơ yếm khí vùng rễ.',
+    reservoirId: 'res-01',
+    resolved: true,
+    suggestedAction: 'Bật máy sục khí phụ trợ và bổ sung nước mát hạ nhiệt độ bồn chứa.',
+    resolvedAt: '2026-09-07 16:30'
+  }
+];
+
+export const INITIAL_HARVESTS: HarvestRecord[] = [
+  {
+    id: 'harv-01',
+    batchId: 'batch-old-01',
+    batchCode: 'LET-2026-000A',
+    cultivarName: 'Green Oak Leaf',
+    harvestDate: '2026-08-14',
+    harvestedPlants: 600,
+    totalWeightKg: 114.6,
+    avgWeightG: 191.0,
+    rejectedWeightKg: 3.2,
+    lossPercentage: 2.7,
+    aiPredictedWeightG: 188.5,
+    differencePercent: 1.33,
+    grade: 'A',
+    notes: 'Lô thu hoạch rất thành công, độ sai lệch AI so với thực tế chỉ 1.33%.'
+  },
+  {
+    id: 'harv-02',
+    batchId: 'batch-old-02',
+    batchCode: 'LET-2026-000B',
+    cultivarName: 'Batavia Lettuce',
+    harvestDate: '2026-08-20',
+    harvestedPlants: 480,
+    totalWeightKg: 97.5,
+    avgWeightG: 203.1,
+    rejectedWeightKg: 4.5,
+    lossPercentage: 4.4,
+    aiPredictedWeightG: 208.0,
+    differencePercent: -2.35,
+    grade: 'A',
+    notes: 'Tán lá đều đẹp, đạt chuẩn siêu thị sạch.'
+  }
+];

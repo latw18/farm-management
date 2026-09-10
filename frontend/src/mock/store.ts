@@ -1,0 +1,250 @@
+import type { CropBatch, Reservoir, Cultivar, NutrientFormula, Alert, HarvestRecord } from '../types/farm';
+import { 
+  INITIAL_BATCHES, 
+  INITIAL_RESERVOIRS, 
+  INITIAL_CULTIVARS, 
+  INITIAL_FORMULAS, 
+  INITIAL_SENSOR_HISTORY, 
+  INITIAL_ALERTS, 
+  INITIAL_HARVESTS 
+} from './initialData';
+
+const STORAGE_KEYS = {
+  BATCHES: 'hydrosmart_batches',
+  RESERVOIRS: 'hydrosmart_reservoirs',
+  CULTIVARS: 'hydrosmart_cultivars',
+  FORMULAS: 'hydrosmart_formulas',
+  SENSORS: 'hydrosmart_sensors',
+  ALERTS: 'hydrosmart_alerts',
+  HARVESTS: 'hydrosmart_harvests'
+};
+
+function getStorage<T>(key: string, fallback: T): T {
+  try {
+    const item = localStorage.getItem(key);
+    if (!item) return fallback;
+    return JSON.parse(item);
+  } catch {
+    return fallback;
+  }
+}
+
+function setStorage<T>(key: string, data: T): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (err) {
+    console.error(`Failed to save to localStorage [${key}]`, err);
+  }
+}
+
+export const farmStore = {
+  // Cultivars
+  getCultivars: (): Cultivar[] => {
+    return getStorage<Cultivar[]>(STORAGE_KEYS.CULTIVARS, INITIAL_CULTIVARS);
+  },
+
+  // Reservoirs
+  getReservoirs: (): Reservoir[] => {
+    const raw = getStorage<Reservoir[]>(STORAGE_KEYS.RESERVOIRS, INITIAL_RESERVOIRS);
+    return raw.map(r => {
+      let cleanName = r.name;
+      if (r.id === 'res-01') cleanName = 'Bể Tuần Hoàn 01 - Giàn NFT Tầng 1';
+      if (r.id === 'res-02') cleanName = 'Bể Tuần Hoàn 02 - Giàn NFT Tầng 2';
+      return {
+        ...r,
+        systemType: 'NFT' as const,
+        name: cleanName
+      };
+    });
+  },
+  
+  updateReservoir: (id: string, updates: Partial<Reservoir>): Reservoir[] => {
+    const list = farmStore.getReservoirs();
+    const updated = list.map(r => r.id === id ? { ...r, ...updates } : r);
+    setStorage(STORAGE_KEYS.RESERVOIRS, updated);
+    return updated;
+  },
+
+  addMeasurementRecord: (data: { reservoirId: string; ph: number; ec: number; doLevel: number; waterTemp: number }): void => {
+    farmStore.updateReservoir(data.reservoirId, {
+      currentPh: data.ph,
+      currentEc: data.ec,
+      currentDo: data.doLevel,
+      currentWaterTemp: data.waterTemp
+    });
+
+    // Also add to sensor history for graphs
+    const sensors = farmStore.getSensorHistory();
+    const now = new Date();
+    const dayStr = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    sensors.push({
+      day: dayStr,
+      time: timeStr,
+      ph: data.ph,
+      ec: data.ec,
+      doLevel: data.doLevel,
+      waterTemp: data.waterTemp,
+      airTemp: 27.5,
+      humidity: 65,
+      vpd: 1.25
+    });
+    setStorage(STORAGE_KEYS.SENSORS, sensors.slice(-20)); // Keep recent 20 readings
+
+    // Rule Engine Check: Auto-generate alert if out of bounds
+    if (data.ph < 5.4 || data.ph > 6.4) {
+      farmStore.addAlert({
+        severity: data.ph < 5.0 || data.ph > 6.8 ? 'critical' : 'warning',
+        metric: 'pH',
+        title: `pH ${data.ph < 5.4 ? 'quá thấp' : 'quá cao'} (${data.ph}) tại Bể`,
+        message: `Độ pH đo được ${data.ph} lệch khỏi khoảng tối ưu (5.5 - 6.2) cho rau xà lách. Ảnh hưởng khả năng hòa tan dinh dưỡng.`,
+        reservoirId: data.reservoirId,
+        suggestedAction: data.ph < 5.4 ? 'Bổ sung dung dịch kiềm pH Up (KOH) từ từ.' : 'Bổ sung pH Down (H3PO4/HNO3) loãng và khuấy đều.'
+      });
+    }
+
+    if (data.ec > 2.1) {
+      farmStore.addAlert({
+        severity: 'warning',
+        metric: 'EC',
+        title: `EC cao bất thường (${data.ec} mS/cm)`,
+        message: `Tổng lượng ion hòa tan cao, cây có nguy cơ ngộ độc phân hoặc cháy chóp lá (tipburn).`,
+        reservoirId: data.reservoirId,
+        suggestedAction: 'Bổ sung nước sạch vào bể để pha loãng dung dịch về ngưỡng 1.6 - 1.8 mS/cm.'
+      });
+    }
+
+    if (data.doLevel < 6.0) {
+      farmStore.addAlert({
+        severity: data.doLevel < 5.0 ? 'critical' : 'warning',
+        metric: 'DO',
+        title: `Oxy hòa tan (DO) thấp (${data.doLevel} mg/L)`,
+        message: `DO dưới ngưỡng 6.0 mg/L gây nghẹt rễ và tạo điều kiện cho nấm Pythium phát triển gây thối rễ.`,
+        reservoirId: data.reservoirId,
+        suggestedAction: 'Kiểm tra máy sục khí (air pump), sục bọt khí mịn và kiểm tra nhiệt độ nước.'
+      });
+    }
+  },
+
+  // Batches
+  getBatches: (): CropBatch[] => {
+    const raw = getStorage<CropBatch[]>(STORAGE_KEYS.BATCHES, INITIAL_BATCHES);
+    return raw.map(b => ({
+      ...b,
+      systemType: 'NFT' as const,
+      reservoirName: b.reservoirId === 'res-01' ? 'Bể Tuần Hoàn 01 (NFT)' : 'Bể Tuần Hoàn 02 (NFT)'
+    }));
+  },
+
+  addBatch: (newBatch: Omit<CropBatch, 'id' | 'status'>): CropBatch => {
+    const list = farmStore.getBatches();
+    const batch: CropBatch = {
+      ...newBatch,
+      id: `batch-${Date.now()}`,
+      status: 'active'
+    };
+    const updated = [batch, ...list];
+    setStorage(STORAGE_KEYS.BATCHES, updated);
+    return batch;
+  },
+
+  updateBatch: (id: string, updates: Partial<CropBatch>): CropBatch[] => {
+    const list = farmStore.getBatches();
+    const updated = list.map(b => b.id === id ? { ...b, ...updates } : b);
+    setStorage(STORAGE_KEYS.BATCHES, updated);
+    return updated;
+  },
+
+  deleteBatch: (id: string): CropBatch[] => {
+    const list = farmStore.getBatches();
+    const updated = list.filter(b => b.id !== id);
+    setStorage(STORAGE_KEYS.BATCHES, updated);
+    return updated;
+  },
+
+  // Formulas
+  getFormulas: (): NutrientFormula[] => {
+    const raw = getStorage<NutrientFormula[]>(STORAGE_KEYS.FORMULAS, INITIAL_FORMULAS);
+    // Auto-migrate if stored formulas have old structure or missing chemical items
+    if (!raw || raw.length === 0 || !raw[0]?.stockAItems || raw.some(f => f.notes?.includes('Deep Water Culture'))) {
+      setStorage(STORAGE_KEYS.FORMULAS, INITIAL_FORMULAS);
+      return INITIAL_FORMULAS;
+    }
+    return raw;
+  },
+
+  // Sensor History
+  getSensorHistory: () => {
+    return getStorage(STORAGE_KEYS.SENSORS, INITIAL_SENSOR_HISTORY);
+  },
+
+  // Alerts
+  getAlerts: (): Alert[] => {
+    return getStorage<Alert[]>(STORAGE_KEYS.ALERTS, INITIAL_ALERTS);
+  },
+
+  addAlert: (alertData: Omit<Alert, 'id' | 'timestamp' | 'resolved'>): Alert => {
+    const list = farmStore.getAlerts();
+    const now = new Date();
+    const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    
+    const newAlert: Alert = {
+      ...alertData,
+      id: `alt-${Date.now()}`,
+      timestamp: timeStr,
+      resolved: false
+    };
+    const updated = [newAlert, ...list];
+    setStorage(STORAGE_KEYS.ALERTS, updated);
+    return newAlert;
+  },
+
+  resolveAlert: (id: string): Alert[] => {
+    const list = farmStore.getAlerts();
+    const now = new Date();
+    const resolvedAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const updated = list.map(a => a.id === id ? { ...a, resolved: true, resolvedAt } : a);
+    setStorage(STORAGE_KEYS.ALERTS, updated);
+    return updated;
+  },
+
+  // Harvests
+  getHarvests: (): HarvestRecord[] => {
+    return getStorage<HarvestRecord[]>(STORAGE_KEYS.HARVESTS, INITIAL_HARVESTS);
+  },
+
+  recordHarvest: (harvestData: Omit<HarvestRecord, 'id' | 'differencePercent' | 'lossPercentage'>): HarvestRecord => {
+    const list = farmStore.getHarvests();
+    const diff = ((harvestData.avgWeightG - harvestData.aiPredictedWeightG) / harvestData.aiPredictedWeightG) * 100;
+    const loss = (harvestData.rejectedWeightKg / (harvestData.totalWeightKg + harvestData.rejectedWeightKg)) * 100;
+
+    const newRecord: HarvestRecord = {
+      ...harvestData,
+      id: `harv-${Date.now()}`,
+      differencePercent: parseFloat(diff.toFixed(2)),
+      lossPercentage: parseFloat(loss.toFixed(1))
+    };
+
+    const updated = [newRecord, ...list];
+    setStorage(STORAGE_KEYS.HARVESTS, updated);
+
+    // Update batch status to harvested
+    farmStore.updateBatch(harvestData.batchId, {
+      status: 'harvested',
+      actualHarvestDate: harvestData.harvestDate
+    });
+
+    return newRecord;
+  },
+
+  resetAllData: () => {
+    localStorage.removeItem(STORAGE_KEYS.BATCHES);
+    localStorage.removeItem(STORAGE_KEYS.RESERVOIRS);
+    localStorage.removeItem(STORAGE_KEYS.CULTIVARS);
+    localStorage.removeItem(STORAGE_KEYS.FORMULAS);
+    localStorage.removeItem(STORAGE_KEYS.SENSORS);
+    localStorage.removeItem(STORAGE_KEYS.ALERTS);
+    localStorage.removeItem(STORAGE_KEYS.HARVESTS);
+  }
+};
