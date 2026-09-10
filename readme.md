@@ -7,6 +7,63 @@
 
 ---
 
+## ⚡ HƯỚNG DẪN CÀI ĐẶT & KHỞI CHẠY (QUICK START)
+
+### 1. Yêu cầu môi trường (Prerequisites)
+- **Node.js**: Phiên bản `>= 18.0.0` (khuyến nghị Node 20 LTS hoặc 22)
+- **Trình quản lý gói**: `npm` (mặc định theo Node) hoặc `pnpm` / `yarn`
+- **Trình duyệt**: Google Chrome, Edge, Safari hoặc Firefox phiên bản hiện đại.
+
+### 2. Các bước cài đặt & Khởi chạy ứng dụng
+
+#### Bước 1: Di chuyển vào thư mục Frontend
+Mở terminal tại thư mục gốc của dự án và chạy:
+```bash
+cd frontend
+```
+
+#### Bước 2: Cài đặt các thư viện phụ thuộc (Dependencies)
+```bash
+npm install
+```
+
+#### Bước 3: Khởi chạy máy chủ phát triển (Dev Server)
+```bash
+npm run dev
+```
+Sau khi chạy, terminal sẽ hiển thị địa chỉ truy cập:
+```text
+  VITE v8.x.x  ready in ~250 ms
+
+  ➜  Local:   http://localhost:5173/
+  ➜  Network: use --host to expose
+```
+👉 Mở trình duyệt và truy cập: **[http://localhost:5173](http://localhost:5173)**
+
+#### Bước 4: Đóng gói bản Production (Tùy chọn)
+```bash
+# Kiểm tra kiểu dữ liệu TypeScript và build bundle tối ưu
+npm run build
+
+# Chạy thử bản production vừa đóng gói
+npm run preview
+```
+
+---
+
+### 3. Danh sách các màn hình và đường dẫn (Routes)
+
+| Đường dẫn (URL) | Chức năng chính | Nội dung chi tiết |
+|---|---|---|
+| **`/dashboard`** | **Bảng điều khiển trung tâm** | Giám sát tổng thể các bồn tuần hoàn NFT, lô cây đang trồng, sự cố khẩn cấp và biểu đồ tăng trưởng. |
+| **`/reservoirs`** | **Quản lý Bể & Dinh dưỡng** | Giám sát pH, EC, DO, nhiệt độ Bể Tuần Hoàn 01 & 02; công cụ tính toán châm phân mẹ Stock A/B và công thức pha 10L mẹ ở kho. |
+| **`/batches`** | **Theo dõi Lô Cây trồng** | Quản lý vòng đời (Gieo hạt → Cây con → NFT Sinh trưởng → Thu hoạch), ghi nhận nhật ký đo đạc sinh trắc học và tạo lô mới. |
+| **`/forecast`** | **AI Dự báo Năng suất** | Dự đoán trọng lượng (g/cây) và sản lượng (kg/lô), phân tích mức độ tác động của các yếu tố (EC, pH, lá thật), chế độ thử nghiệm What-If. |
+| **`/alerts`** | **Trung tâm Cảnh báo** | Giám sát các sự cố nồng độ EC tụt, pH lệch ngưỡng, thiếu oxy rễ (DO) kèm quy trình xử lý từng bước. |
+| **`/harvest`** | **Nhật ký & So sánh Thu hoạch** | Thống kê sản lượng thực tế, đối chiếu sai số với dự báo AI và theo dõi tỷ lệ rau đạt tiêu chuẩn loại 1. |
+
+---
+
 # 1. Đề tài làm gì?
 
 Xây dựng một **phần mềm quản lý trang trại thủy canh** giúp người quản lý và kỹ sư nông nghiệp theo dõi toàn bộ quá trình:
