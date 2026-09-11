@@ -8,61 +8,80 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import type { Reservoir, NutrientFormula } from '../types/farm';
+import { AgronomicTooltip } from '../components/AgronomicTooltip';
 
 interface ReservoirsViewProps {
   reservoirs: Reservoir[];
   formulas: NutrientFormula[];
-  onAddMeasurement: (data: { reservoirId: string; ph: number; ec: number; doLevel: number; waterTemp: number }) => void;
+  onAddMeasurement: (data: { reservoirId: string; ph: number; ec: number; waterTemp: number }) => void;
   onUpdateVolume: (reservoirId: string, addedLiters: number) => void;
+  onApplyDosing?: (reservoirId: string, targetEc: number, doseMl: number) => void;
 }
 
 export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
   reservoirs,
   formulas = [],
   onAddMeasurement,
-  onUpdateVolume
+  onUpdateVolume,
+  onApplyDosing
 }) => {
-  const activeFormula = formulas[0];
   const [selectedResId, setSelectedResId] = useState<string>(reservoirs[0]?.id || '');
+  const [selectedFormulaId, setSelectedFormulaId] = useState<string>(formulas[0]?.id || '');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
+  const [dosingSuccessMsg, setDosingSuccessMsg] = useState<string | null>(null);
 
-  // Selected reservoir
+  // Selected reservoir & formula
   const selectedRes = reservoirs.find(r => r.id === selectedResId) || reservoirs[0];
+  const activeFormula = formulas.find(f => f.id === selectedFormulaId) || formulas[0];
 
   // Measure form state
   const [formPh, setFormPh] = useState(selectedRes ? selectedRes.currentPh : 5.85);
   const [formEc, setFormEc] = useState(selectedRes ? selectedRes.currentEc : 1.72);
-  const [formDo, setFormDo] = useState(selectedRes ? selectedRes.currentDo : 6.8);
   const [formTemp, setFormTemp] = useState(selectedRes ? selectedRes.currentWaterTemp : 22.4);
 
   // Top up form state
   const [topUpLiters, setTopUpLiters] = useState(50);
 
-  // Calculator State
-  const [calcTargetEc, setCalcTargetEc] = useState<number>(1.70);
-  const [calcMode, setCalcMode] = useState<'topup' | 'new_tank'>('topup');
+  // Dosing state
+  const [targetEc, setTargetEc] = useState<number>(activeFormula ? activeFormula.targetEc : 1.75);
 
   // Sync state when selected reservoir changes
   useEffect(() => {
     if (selectedRes) {
       setFormPh(selectedRes.currentPh);
       setFormEc(selectedRes.currentEc);
-      setFormDo(selectedRes.currentDo);
       setFormTemp(selectedRes.currentWaterTemp);
-      setCalcTargetEc(selectedRes.currentEc >= 1.70 ? selectedRes.currentEc : 1.70);
     }
   }, [selectedResId]);
 
-  // Dosing logic:
-  // Standard 1:100 ratio: 10ml Stock A + 10ml Stock B per 1L of water provides ~1.65 mS/cm EC.
-  const calcDeltaEc = Math.max(0, parseFloat((calcTargetEc - (selectedRes?.currentEc || 1.72)).toFixed(2)));
-  const tankVolume = selectedRes?.currentVolumeLiters || 500;
-  
-  const calculatedDoseMl = calcMode === 'new_tank' 
-    ? Math.round(tankVolume * 10)
-    : Math.round((calcDeltaEc / 1.65) * tankVolume * 10);
+  useEffect(() => {
+    if (activeFormula) {
+      setTargetEc(activeFormula.targetEc);
+    }
+  }, [selectedFormulaId]);
+
+  if (!selectedRes) {
+    return (
+      <div className="clean-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
+        <p>Chưa có bể dinh dưỡng nào được thiết lập.</p>
+      </div>
+    );
+  }
+
+  // Dosing calculation:
+  // Empirical rule: 10ml of Stock A + 10ml of Stock B per 100L increases EC by approx 0.10 mS/cm
+  const ecDeficit = Math.max(0, targetEc - selectedRes.currentEc);
+  const dosingRatioFactor = (selectedRes.currentVolumeLiters / 100);
+  const recommendedDoseMlPerStock = Math.round((ecDeficit / 0.10) * 10 * dosingRatioFactor);
+
+  // Aliases for UI compatibility
+  const calcTargetEc = targetEc;
+  const setCalcTargetEc = setTargetEc;
+  const calcDeltaEc = ecDeficit;
+  const calculatedDoseMl = recommendedDoseMlPerStock;
   const calculatedDoseLiters = (calculatedDoseMl / 1000).toFixed(2);
+  const [calcMode, setCalcMode] = useState<'topup' | 'new_tank'>('topup');
 
   const handleLogSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +89,6 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
       reservoirId: selectedResId,
       ph: parseFloat(String(formPh)),
       ec: parseFloat(String(formEc)),
-      doLevel: parseFloat(String(formDo)),
       waterTemp: parseFloat(String(formTemp))
     });
     setIsLogModalOpen(false);
@@ -82,13 +100,15 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
     setIsTopUpModalOpen(false);
   };
 
-  if (!selectedRes) {
-    return (
-      <div className="clean-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
-        <p>Chưa có bể dinh dưỡng nào được thiết lập.</p>
-      </div>
-    );
-  }
+  const handleConfirmDosing = () => {
+    if (onApplyDosing && recommendedDoseMlPerStock > 0) {
+      onApplyDosing(selectedRes.id, targetEc, recommendedDoseMlPerStock);
+      setDosingSuccessMsg(`Đã xác nhận châm ${recommendedDoseMlPerStock}ml Can A và Can B vào ${selectedRes.name.split('-')[0].trim()}! Nồng độ EC đã được cập nhật đạt chuẩn.`);
+      setTimeout(() => setDosingSuccessMsg(null), 5000);
+    }
+  };
+
+  const handleExecuteDosing = handleConfirmDosing;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -160,13 +180,40 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
         </div>
       </div>
 
+      {/* Dosing Success Toast */}
+      {dosingSuccessMsg && (
+        <div style={{
+          backgroundColor: 'var(--primary-50)',
+          border: '1px solid var(--primary-200)',
+          borderRadius: 'var(--radius-md)',
+          padding: '12px 16px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          color: 'var(--primary-900)',
+          fontSize: '0.875rem',
+          animation: 'fadeIn 0.2s ease-in'
+        }}>
+          <CheckCircle2 size={18} color="var(--primary-700)" />
+          <span>{dosingSuccessMsg}</span>
+        </div>
+      )}
+
       {/* 2. Top Section: 4 Clear KPI Cards of the Selected Tank */}
       <div className="kpi-grid">
         {/* Metric 1: pH */}
         <div className="kpi-card">
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="kpi-label">Độ pH dung dịch</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="kpi-label">Độ pH dung dịch</span>
+                <AgronomicTooltip 
+                  title="Độ pH dung dịch dinh dưỡng" 
+                  optimalRange="5.60 - 6.20" 
+                  explanation="Độ axit/kiềm ảnh hưởng trực tiếp đến khả năng hòa tan của muối khoáng. Giữ pH axit nhẹ giúp rễ cây hấp thu tối đa vi lượng Fe, Mn, Zn, Cu mà không bị kết tủa."
+                  warningNotice="Dùng dung dịch pH Down (H3PO4/HNO3) nếu pH > 6.5 hoặc pH Up (KOH) nếu pH < 5.5."
+                />
+              </div>
               <span className={`badge ${selectedRes.currentPh >= 5.5 && selectedRes.currentPh <= 6.2 ? 'badge-success' : 'badge-warning'}`}>
                 {selectedRes.currentPh >= 5.5 && selectedRes.currentPh <= 6.2 ? 'Đạt chuẩn' : 'Cần cân chỉnh'}
               </span>
@@ -184,7 +231,15 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
         <div className="kpi-card">
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="kpi-label">Độ dẫn điện dinh dưỡng (EC)</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="kpi-label">Độ dẫn điện dinh dưỡng (EC)</span>
+                <AgronomicTooltip 
+                  title="Nồng độ dẫn điện EC (Tải muối khoáng)" 
+                  optimalRange="1.50 - 1.85 mS/cm" 
+                  explanation="Chỉ số phản ánh tổng lượng phân bón muối khoáng hòa tan trong bể. Duy trì ổn định giúp búp xà lách phát triển khỏe, đạt trọng lượng mục tiêu."
+                  warningNotice="Khi EC tụt < 1.3 mS/cm, cần châm thêm dung dịch mẹ Can A và Can B theo tỷ lệ 1:1."
+                />
+              </div>
               <span className={`badge ${selectedRes.currentEc >= 1.5 && selectedRes.currentEc <= 1.85 ? 'badge-success' : 'badge-warning'}`}>
                 {selectedRes.currentEc >= 1.5 && selectedRes.currentEc <= 1.85 ? 'Đạt chuẩn' : 'Lệch ngưỡng'}
               </span>
@@ -198,29 +253,19 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
           </div>
         </div>
 
-        {/* Metric 3: DO */}
+        {/* Metric 3: Water Temp */}
         <div className="kpi-card">
           <div style={{ flex: 1 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="kpi-label">Oxy hòa tan (DO)</div>
-              <span className={`badge ${selectedRes.currentDo >= 6.0 ? 'badge-success' : 'badge-danger'}`}>
-                {selectedRes.currentDo >= 6.0 ? 'Rất tốt' : 'Thiếu oxy'}
-              </span>
-            </div>
-            <div className="kpi-value">
-              {selectedRes.currentDo.toFixed(2)} <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-muted)' }}>mg/L</span>
-            </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', marginTop: '2px' }}>
-              Tiêu chuẩn rễ: &gt; 6.0 mg/L
-            </div>
-          </div>
-        </div>
-
-        {/* Metric 4: Water Temp */}
-        <div className="kpi-card">
-          <div style={{ flex: 1 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="kpi-label">Nhiệt độ nước bồn</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="kpi-label">Nhiệt độ nước bồn</span>
+                <AgronomicTooltip 
+                  title="Nhiệt độ nước bồn chứa" 
+                  optimalRange="20.0 - 23.5°C" 
+                  explanation="Nhiệt độ dung dịch mát giúp duy trì rễ cây trắng tinh, hô hấp và hấp thu phân bón khỏe mạnh."
+                  warningNotice="Nước ấm > 24.5°C làm tăng nguy cơ nấm bệnh Pythium bùng phát gây thối rễ xà lách."
+                />
+              </div>
               <span className={`badge ${selectedRes.currentWaterTemp <= 24.0 ? 'badge-success' : 'badge-warning'}`}>
                 {selectedRes.currentWaterTemp <= 24.0 ? 'Mát mẻ' : 'Hơi ấm'}
               </span>
@@ -229,7 +274,31 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
               {selectedRes.currentWaterTemp.toFixed(1)} <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-muted)' }}>°C</span>
             </div>
             <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', marginTop: '2px' }}>
-              Tối ưu cho xà lách: 20 - 23°C
+              Tối ưu cho xà lách: 20 - 23.5°C
+            </div>
+          </div>
+        </div>
+
+        {/* Metric 4: Water Volume */}
+        <div className="kpi-card">
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="kpi-label">Thể tích nước hiện tại</span>
+                <AgronomicTooltip 
+                  title="Mực nước & Thể tích bể" 
+                  explanation="Lượng nước dinh dưỡng hiện có trong bể chứa. Cần đảm bảo trên 50% dung tích để máy bơm tuần hoàn màng NFT luôn ổn định, tránh hụt nước khi nắng to."
+                />
+              </div>
+              <span className="badge badge-neutral">
+                {Math.round((selectedRes.currentVolumeLiters / selectedRes.capacityLiters) * 100)}% đầy
+              </span>
+            </div>
+            <div className="kpi-value">
+              {selectedRes.currentVolumeLiters} <span style={{ fontSize: '0.875rem', fontWeight: 500, color: 'var(--text-muted)' }}>/ {selectedRes.capacityLiters} L</span>
+            </div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', marginTop: '2px' }}>
+              Tuần hoàn: Bơm {selectedRes.pumpStatus === 'running' ? 'Đang chạy' : 'Dừng'}
             </div>
           </div>
         </div>
@@ -354,6 +423,19 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
                 <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>({calculatedDoseLiters} Lít)</div>
               </div>
             </div>
+
+            {/* Action button to execute dosing */}
+            {calculatedDoseMl > 0 && (
+              <button
+                type="button"
+                onClick={handleExecuteDosing}
+                className="btn btn-primary"
+                style={{ width: '100%', marginTop: '12px', justifyContent: 'center', height: '36px' }}
+              >
+                <CheckCircle2 size={16} />
+                <span>Xác nhận đã châm phân vào {selectedRes.name.split('-')[0].trim()}</span>
+              </button>
+            )}
           </div>
 
           {/* 3 Step Safety Guide */}
@@ -364,7 +446,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
 
         {/* Right Column: Công thức pha can 10L ở kho */}
         <div className="clean-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div className="card-header" style={{ marginBottom: 0 }}>
+          <div className="card-header" style={{ marginBottom: 0, alignItems: 'flex-start' }}>
             <div>
               <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <FlaskConical size={18} color="var(--primary-600)" />
@@ -374,9 +456,25 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
                 Định lượng hóa chất khi pha sẵn can 10 Lít đậm đặc (tỷ lệ 1:100)
               </p>
             </div>
-            <span className="badge badge-neutral">
-              {activeFormula?.systemType ? 'Hệ NFT Tuần Hoàn' : 'Chuẩn Hoagland - Resh'}
-            </span>
+            
+            {/* Formula Selector Dropdown */}
+            {formulas.length > 1 && (
+              <select
+                value={selectedFormulaId}
+                onChange={e => setSelectedFormulaId(e.target.value)}
+                className="form-select"
+                style={{ fontSize: '0.75rem', padding: '4px 8px', height: '30px', maxWidth: '200px' }}
+              >
+                {formulas.map(f => (
+                  <option key={f.id} value={f.id}>{f.name.split('(')[0].trim()}</option>
+                ))}
+              </select>
+            )}
+          </div>
+
+          {/* Active Formula Description Badge */}
+          <div style={{ fontSize: '0.75rem', color: 'var(--primary-800)', backgroundColor: 'var(--primary-50)', padding: '6px 10px', borderRadius: 'var(--radius-sm)' }}>
+            <strong>Áp dụng:</strong> {activeFormula?.applicableCrop} | <em>{activeFormula?.scientificStandard}</em>
           </div>
 
           {/* 2 Can Side-by-Side Boxes */}
@@ -402,18 +500,12 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                  <span>Canxi Nitrat [Ca(NO3)2]</span>
-                  <strong style={{ color: 'var(--primary-800)' }}>1,000 g</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                  <span>Kali Nitrat [KNO3]</span>
-                  <strong>200 g</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                  <span>Sắt Chelate [Fe-EDDHA 6%]</span>
-                  <strong style={{ color: 'var(--primary-800)' }}>40 g</strong>
-                </div>
+                {activeFormula?.stockAItems?.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
+                    <span>{item.name}</span>
+                    <strong style={{ color: 'var(--primary-800)' }}>{item.gramsPer10LStock} g</strong>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -438,26 +530,12 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.75rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                  <span>MKP Lân [KH2PO4]</span>
-                  <strong style={{ color: 'var(--info-text)' }}>250 g</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                  <span>Kali Nitrat [KNO3]</span>
-                  <strong>400 g</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                  <span>Magie Sunfat [MgSO4]</span>
-                  <strong>550 g</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
-                  <span>Kali Sunfat [K2SO4]</span>
-                  <strong>100 g</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0' }}>
-                  <span>Vi lượng Chelate tổng hợp</span>
-                  <strong>25 g</strong>
-                </div>
+                {activeFormula?.stockBItems?.map((item, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', borderBottom: '1px dashed var(--border-subtle)' }}>
+                    <span>{item.name}</span>
+                    <strong style={{ color: 'var(--info-text)' }}>{item.gramsPer10LStock} g</strong>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -472,7 +550,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
             lineHeight: 1.45,
             color: '#92400e'
           }}>
-            <strong>Tại sao phải chia Can A và Can B?</strong> Canxi trong Can A nếu gặp Lân và Sunfat trong Can B ở nồng độ đậm đặc sẽ phản ứng kết tủa thành thạch cao không tan (CaSO4 và Ca3(PO4)2), làm nghẹt máng NFT và cây bị cháy mép lá.
+            <strong>Tại sao phải chia Can A và Can B?</strong> {activeFormula?.chemicalIncompatibilityReason || 'Canxi trong Can A nếu gặp Lân và Sunfat trong Can B ở nồng độ đậm đặc sẽ phản ứng kết tủa thành thạch cao không tan (CaSO4 và Ca3(PO4)2), làm nghẹt máng NFT và cây bị cháy mép lá.'}
           </div>
         </div>
 
@@ -526,21 +604,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
                     />
                   </div>
 
-                  <div className="form-group">
-                    <label className="form-label">Oxy hòa tan DO (mg/L - Chuẩn: &gt; 6.0)</label>
-                    <input 
-                      type="number" 
-                      step="0.1"
-                      min="2.0"
-                      max="12.0"
-                      className="form-input" 
-                      value={formDo} 
-                      onChange={e => setFormDo(parseFloat(e.target.value))} 
-                      required 
-                    />
-                  </div>
-
-                  <div className="form-group">
+                  <div className="form-group" style={{ gridColumn: 'span 2' }}>
                     <label className="form-label">Nhiệt độ nước (°C - Chuẩn: 20 - 24)</label>
                     <input 
                       type="number" 
@@ -635,3 +699,4 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
     </div>
   );
 };
+

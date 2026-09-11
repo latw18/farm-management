@@ -5,6 +5,8 @@ import {
 } from 'lucide-react';
 import type { HarvestRecord, CropBatch } from '../types/farm';
 
+import { predictLettuceYield } from '../services/aiPredictor';
+
 interface HarvestViewProps {
   harvests: HarvestRecord[];
   batches: CropBatch[];
@@ -37,9 +39,25 @@ export const HarvestView: React.FC<HarvestViewProps> = ({
     if (!selectedBatch) return;
 
     const avgWeightG = Math.round(((Number(totalWeightKg) * 1000) / Number(harvestedPlants)) * 10) / 10;
-    const aiPredG = selectedBatch.lastObservation?.sampleWeightG 
-      ? Math.max(selectedBatch.lastObservation.sampleWeightG, 188.0) 
-      : 190.0;
+    
+    // Compute genuine AI model prediction for this batch as Ground Truth reference
+    const seedTime = new Date(selectedBatch.seedDate).getTime();
+    const hDate = new Date(harvestDate).getTime();
+    const ageDays = Math.max(1, Math.round((hDate - seedTime) / (1000 * 3600 * 24)));
+    
+    const predResult = predictLettuceYield({
+      batchId: selectedBatch.id,
+      batchCode: selectedBatch.batchCode,
+      cultivarName: selectedBatch.cultivarName,
+      plantAgeDays: ageDays,
+      leafCount: selectedBatch.lastObservation?.avgLeafCount || Math.max(16, Math.round(ageDays * 0.6)),
+      plantHeightCm: selectedBatch.lastObservation?.avgHeightCm || Math.max(16, Math.round(ageDays * 0.55)),
+      avgEc: 1.72,
+      avgPh: 5.85,
+      avgWaterTemp: 22.4,
+      expectedPlants: Number(harvestedPlants)
+    });
+    const aiPredG = predResult.predictedFreshWeightG;
 
     onRecordHarvest({
       batchId: selectedBatch.id,

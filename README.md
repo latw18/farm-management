@@ -60,10 +60,10 @@ npm run preview
 | Đường dẫn (Route) | Phân hệ chức năng | Mô tả ngắn gọn |
 |---|---|---|
 | **[`/dashboard`](http://localhost:5173/dashboard)** | **Bảng điều khiển trung tâm** | Giám sát nhanh các bồn tuần hoàn NFT, lô cây đang trồng, sự cố khẩn cấp và biểu đồ tăng trưởng. |
-| **[`/reservoirs`](http://localhost:5173/reservoirs)** | **Quản lý Bể & Dinh dưỡng** | Giám sát pH, EC, DO, nhiệt độ Bể Tuần Hoàn 01 & 02; công cụ tính toán châm phân mẹ Stock A/B và công thức pha 10L mẹ ở kho. |
+| **[`/reservoirs`](http://localhost:5173/reservoirs)** | **Quản lý Bể & Dinh dưỡng** | Giám sát pH, EC, nhiệt độ Bể Tuần Hoàn 01 & 02; công cụ tính toán châm phân mẹ Stock A/B và công thức pha 10L mẹ ở kho. |
 | **[`/batches`](http://localhost:5173/batches)** | **Theo dõi Lô Cây trồng** | Quản lý vòng đời (Gieo hạt → Cây con → NFT Sinh trưởng → Thu hoạch), ghi nhận nhật ký đo đạc sinh trắc học và tạo lô mới. |
 | **[`/forecast`](http://localhost:5173/forecast)** | **AI Dự báo Năng suất** | Dự đoán trọng lượng (g/cây) và sản lượng (kg/lô), phân tích mức độ tác động của các yếu tố (EC, pH, lá thật), chế độ thử nghiệm What-If. |
-| **[`/alerts`](http://localhost:5173/alerts)** | **Trung tâm Cảnh báo** | Giám sát các sự cố nồng độ EC tụt, pH lệch ngưỡng, thiếu oxy rễ (DO) kèm quy trình xử lý từng bước. |
+| **[`/alerts`](http://localhost:5173/alerts)** | **Trung tâm Cảnh báo** | Giám sát các sự cố nồng độ EC tụt, pH lệch ngưỡng, sốc nhiệt nước kèm quy trình xử lý từng bước. |
 | **[`/harvest`](http://localhost:5173/harvest)** | **Nhật ký & So sánh Thu hoạch** | Thống kê sản lượng thực tế, đối chiếu sai số với dự báo AI và theo dõi tỷ lệ rau đạt tiêu chuẩn loại 1. |
 
 ---
