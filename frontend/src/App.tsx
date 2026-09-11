@@ -24,6 +24,8 @@ export const App: React.FC = () => {
   const [sensorHistory, setSensorHistory] = useState(() => farmStore.getSensorHistory());
   const [alerts, setAlerts] = useState(() => farmStore.getAlerts());
   const [harvests, setHarvests] = useState(() => farmStore.getHarvests());
+  const [channels, setChannels] = useState(() => farmStore.getChannels());
+  const [drainEvents, setDrainEvents] = useState(() => farmStore.getDrainEvents());
 
   // Batch targeted for AI simulation
   const [selectedBatchForAI, setSelectedBatchForAI] = useState<CropBatch | null>(null);
@@ -35,6 +37,8 @@ export const App: React.FC = () => {
     setSensorHistory(farmStore.getSensorHistory());
     setAlerts(farmStore.getAlerts());
     setHarvests(farmStore.getHarvests());
+    setChannels(farmStore.getChannels());
+    setDrainEvents(farmStore.getDrainEvents());
   };
 
   const handleAddBatch = (data: any) => {
@@ -95,8 +99,18 @@ export const App: React.FC = () => {
     showToast('Chuyển giai đoạn', `Lô đã chuyển sang: ${stageNames[newStage] || newStage}`, 'info');
   };
 
-  const handleResolveAlert = (id: string) => {
-    farmStore.resolveAlert(id);
+  const handleResolveAlert = (id: string, by?: string, note?: string) => {
+    farmStore.resolveAlert(id, by, note);
+    refreshState();
+  };
+
+  const handleAcknowledgeAlert = (id: string, by: string) => {
+    farmStore.acknowledgeAlert(id, by);
+    refreshState();
+  };
+
+  const handleDrainReservoir = (event: any) => {
+    farmStore.addDrainEvent(event);
     refreshState();
     showToast('Đã xử lý cảnh báo', 'Cảnh báo đã được đánh dấu hoàn thành', 'success');
   };
@@ -122,7 +136,7 @@ export const App: React.FC = () => {
     navigate('/' + tab);
   };
 
-  const unreadAlertsCount = alerts.filter(a => !a.resolved).length;
+  const unreadAlertsCount = alerts.filter(a => a.status === 'open' || a.status === 'acknowledged').length;
 
   return (
     <div className="app-container">
@@ -173,9 +187,12 @@ export const App: React.FC = () => {
                 <ReservoirsView
                   reservoirs={reservoirs}
                   formulas={formulas}
+                  channels={channels}
+                  batches={batches}
+                  drainEvents={drainEvents}
                   onAddMeasurement={handleAddMeasurement}
                   onUpdateVolume={handleUpdateVolume}
-                  onApplyDosing={handleApplyDosing}
+                  onDrainReservoir={handleDrainReservoir}
                 />
               }
             />
@@ -195,6 +212,7 @@ export const App: React.FC = () => {
               element={
                 <AlertsView
                   alerts={alerts}
+                  onAcknowledgeAlert={handleAcknowledgeAlert}
                   onResolveAlert={handleResolveAlert}
                 />
               }

@@ -16,7 +16,9 @@ export type BatchStatus = 'active' | 'harvested' | 'failed';
 
 export type AlertSeverity = 'critical' | 'warning' | 'info';
 
-export type AlertMetric = 'pH' | 'EC' | 'Temp' | 'Nutrient' | 'System';
+export type AlertStatus = 'open' | 'acknowledged' | 'resolved' | 'escalated';
+
+export type AlertMetric = 'pH' | 'EC' | 'DO' | 'Temp' | 'Nutrient' | 'System';
 
 export interface Cultivar {
   id: string;
@@ -148,14 +150,48 @@ export interface Alert {
   id: string;
   timestamp: string;
   severity: AlertSeverity;
+  status: AlertStatus;
   metric: AlertMetric;
   title: string;
   message: string;
   reservoirId?: string;
   batchId?: string;
+  /** @deprecated use status instead */
   resolved: boolean;
   suggestedAction: string;
+  assignedTo?: string;
+  acknowledgedBy?: string;
+  acknowledgedAt?: string;
+  resolvedBy?: string;
   resolvedAt?: string;
+  escalatedTo?: string;
+  escalatedAt?: string;
+  resolutionNote?: string;
+}
+
+export interface Channel {
+  id: string;
+  name: string;
+  reservoirId: string;
+  batchId?: string;
+  slotCount: number;
+  activePlants: number;
+  status: 'active' | 'empty' | 'maintenance';
+  notes?: string;
+}
+
+export interface SolutionDrainEvent {
+  id: string;
+  reservoirId: string;
+  batchId?: string;
+  drainDate: string;
+  volumeDrainedLiters: number;
+  finalPh: number;
+  finalEc: number;
+  finalDo: number;
+  reason: 'end_of_batch' | 'scheduled_replacement' | 'contamination' | 'other';
+  operator: string;
+  notes?: string;
 }
 
 export interface FeatureContribution {
