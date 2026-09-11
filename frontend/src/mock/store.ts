@@ -1,4 +1,4 @@
-import type { CropBatch, Reservoir, Cultivar, NutrientFormula, Alert, HarvestRecord } from '../types/farm';
+import type { CropBatch, Reservoir, Cultivar, NutrientFormula, Alert, HarvestRecord, Channel, SolutionDrainEvent } from '../types/farm';
 import { 
   INITIAL_BATCHES, 
   INITIAL_RESERVOIRS, 
@@ -6,7 +6,9 @@ import {
   INITIAL_FORMULAS, 
   INITIAL_SENSOR_HISTORY, 
   INITIAL_ALERTS, 
-  INITIAL_HARVESTS 
+  INITIAL_HARVESTS,
+  INITIAL_CHANNELS,
+  INITIAL_DRAIN_EVENTS
 } from './initialData';
 
 const STORAGE_KEYS = {
@@ -16,7 +18,9 @@ const STORAGE_KEYS = {
   FORMULAS: 'hydrosmart_formulas',
   SENSORS: 'hydrosmart_sensors',
   ALERTS: 'hydrosmart_alerts',
-  HARVESTS: 'hydrosmart_harvests'
+  HARVESTS: 'hydrosmart_harvests',
+  CHANNELS: 'hydrosmart_channels',
+  DRAIN_EVENTS: 'hydrosmart_drain_events'
 };
 
 function getStorage<T>(key: string, fallback: T): T {
@@ -184,7 +188,7 @@ export const farmStore = {
     return getStorage<Alert[]>(STORAGE_KEYS.ALERTS, INITIAL_ALERTS);
   },
 
-  addAlert: (alertData: Omit<Alert, 'id' | 'timestamp' | 'resolved'>): Alert => {
+  addAlert: (alertData: Omit<Alert, 'id' | 'timestamp' | 'resolved' | 'status'>): Alert => {
     const list = farmStore.getAlerts();
     const now = new Date();
     const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -193,20 +197,73 @@ export const farmStore = {
       ...alertData,
       id: `alt-${Date.now()}`,
       timestamp: timeStr,
-      resolved: false
+      resolved: false,
+      status: 'open',
+      assignedTo: 'Kỹ sư Nông nghiệp'
     };
     const updated = [newAlert, ...list];
     setStorage(STORAGE_KEYS.ALERTS, updated);
     return newAlert;
   },
 
-  resolveAlert: (id: string): Alert[] => {
+  acknowledgeAlert: (id: string, acknowledgedBy: string): Alert[] => {
     const list = farmStore.getAlerts();
     const now = new Date();
-    const resolvedAt = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    const updated = list.map(a => a.id === id ? { ...a, resolved: true, resolvedAt } : a);
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const updated = list.map(a => a.id === id ? {
+      ...a,
+      status: 'acknowledged' as const,
+      acknowledgedBy,
+      acknowledgedAt: `${now.toISOString().split('T')[0]} ${timeStr}`
+    } : a);
     setStorage(STORAGE_KEYS.ALERTS, updated);
     return updated;
+  },
+
+  resolveAlert: (id: string, resolvedBy?: string, resolutionNote?: string): Alert[] => {
+    const list = farmStore.getAlerts();
+    const now = new Date();
+    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const updated = list.map(a => a.id === id ? {
+      ...a,
+      resolved: true,
+      status: 'resolved' as const,
+      resolvedBy: resolvedBy || 'Kỹ sư Nông nghiệp',
+      resolvedAt: timeStr,
+      resolutionNote: resolutionNote || ''
+    } : a);
+    setStorage(STORAGE_KEYS.ALERTS, updated);
+    return updated;
+  },
+
+  // Channels
+  getChannels: (): Channel[] => {
+    return getStorage<Channel[]>(STORAGE_KEYS.CHANNELS, INITIAL_CHANNELS);
+  },
+
+  getChannelsByReservoir: (reservoirId: string): Channel[] => {
+    return farmStore.getChannels().filter(c => c.reservoirId === reservoirId);
+  },
+
+  // Solution Drain Events
+  getDrainEvents: (): SolutionDrainEvent[] => {
+    return getStorage<SolutionDrainEvent[]>(STORAGE_KEYS.DRAIN_EVENTS, INITIAL_DRAIN_EVENTS);
+  },
+
+  addDrainEvent: (eventData: Omit<SolutionDrainEvent, 'id'>): SolutionDrainEvent => {
+    const list = farmStore.getDrainEvents();
+    const newEvent: SolutionDrainEvent = {
+      ...eventData,
+      id: `drain-${Date.now()}`
+    };
+    const updated = [newEvent, ...list];
+    setStorage(STORAGE_KEYS.DRAIN_EVENTS, updated);
+    // Reset reservoir volume after drain
+    farmStore.updateReservoir(eventData.reservoirId, {
+      currentVolumeLiters: 0,
+      lastReplacementDate: eventData.drainDate
+    });
+    return newEvent;
   },
 
   // Harvests
@@ -246,5 +303,7 @@ export const farmStore = {
     localStorage.removeItem(STORAGE_KEYS.SENSORS);
     localStorage.removeItem(STORAGE_KEYS.ALERTS);
     localStorage.removeItem(STORAGE_KEYS.HARVESTS);
+    localStorage.removeItem(STORAGE_KEYS.CHANNELS);
+    localStorage.removeItem(STORAGE_KEYS.DRAIN_EVENTS);
   }
 };

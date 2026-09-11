@@ -5,27 +5,40 @@ import {
   Calculator,
   FlaskConical,
   CheckCircle2,
-  AlertTriangle
+  AlertTriangle,
+  Layers,
+  Trash2,
+  History
 } from 'lucide-react';
-import type { Reservoir, NutrientFormula } from '../types/farm';
+import type { Reservoir, NutrientFormula, Channel, SolutionDrainEvent, CropBatch } from '../types/farm';
 
 interface ReservoirsViewProps {
   reservoirs: Reservoir[];
   formulas: NutrientFormula[];
+  channels: Channel[];
+  batches: CropBatch[];
+  drainEvents: SolutionDrainEvent[];
   onAddMeasurement: (data: { reservoirId: string; ph: number; ec: number; doLevel: number; waterTemp: number }) => void;
   onUpdateVolume: (reservoirId: string, addedLiters: number) => void;
+  onDrainReservoir: (event: Omit<SolutionDrainEvent, 'id'>) => void;
 }
 
 export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
   reservoirs,
   formulas = [],
+  channels = [],
+  batches = [],
+  drainEvents = [],
   onAddMeasurement,
-  onUpdateVolume
+  onUpdateVolume,
+  onDrainReservoir
 }) => {
   const activeFormula = formulas[0];
   const [selectedResId, setSelectedResId] = useState<string>(reservoirs[0]?.id || '');
   const [isLogModalOpen, setIsLogModalOpen] = useState(false);
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
+  const [isDrainModalOpen, setIsDrainModalOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'dosing' | 'channels' | 'history'>('dosing');
 
   // Selected reservoir
   const selectedRes = reservoirs.find(r => r.id === selectedResId) || reservoirs[0];
@@ -38,6 +51,15 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
 
   // Top up form state
   const [topUpLiters, setTopUpLiters] = useState(50);
+
+  // Drain form state
+  const [drainReason, setDrainReason] = useState<SolutionDrainEvent['reason']>('end_of_batch');
+  const [drainOperator, setDrainOperator] = useState('Kỹ sư Nông nghiệp');
+  const [drainNotes, setDrainNotes] = useState('');
+
+  // Channels for selected reservoir
+  const resChannels = channels.filter(c => c.reservoirId === selectedResId);
+  const resDrainHistory = drainEvents.filter(e => e.reservoirId === selectedResId);
 
   // Calculator State
   const [calcTargetEc, setCalcTargetEc] = useState<number>(1.70);
@@ -80,6 +102,24 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
     e.preventDefault();
     onUpdateVolume(selectedResId, Number(topUpLiters));
     setIsTopUpModalOpen(false);
+  };
+
+  const handleDrainSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedRes) return;
+    onDrainReservoir({
+      reservoirId: selectedResId,
+      drainDate: new Date().toISOString().split('T')[0],
+      volumeDrainedLiters: selectedRes.currentVolumeLiters,
+      finalPh: selectedRes.currentPh,
+      finalEc: selectedRes.currentEc,
+      finalDo: selectedRes.currentDo,
+      reason: drainReason,
+      operator: drainOperator,
+      notes: drainNotes
+    });
+    setIsDrainModalOpen(false);
+    setDrainNotes('');
   };
 
   if (!selectedRes) {
@@ -148,6 +188,14 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
           >
             <RefreshCw size={14} />
             <span>Châm thêm nước sạch</span>
+          </button>
+          <button
+            onClick={() => setIsDrainModalOpen(true)}
+            className="btn btn-secondary"
+            style={{ height: '36px', color: 'var(--danger-text)', borderColor: 'var(--danger)' }}
+          >
+            <Trash2 size={14} />
+            <span>Xả bể / Thay dung dịch</span>
           </button>
           <button 
             onClick={() => setIsLogModalOpen(true)}
@@ -235,9 +283,33 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
         </div>
       </div>
 
-      {/* 3. Main Operational Section: 2 Columns */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1.25fr', gap: '20px' }}>
-        
+      {/* 3. Tab Navigation */}
+      <div style={{ display: 'flex', gap: '4px', borderBottom: '2px solid var(--border-subtle)', paddingBottom: '0' }}>
+        {[
+          { id: 'dosing',   label: 'Châm dinh dưỡng & Công thức', icon: <Calculator size={14} /> },
+          { id: 'channels', label: 'Máng trồng (Channel)', icon: <Layers size={14} /> },
+          { id: 'history',  label: 'Lịch sử xả bể', icon: <History size={14} /> },
+        ].map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as typeof activeTab)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '8px 14px', border: 'none', background: 'none', cursor: 'pointer',
+              fontSize: '0.8125rem', fontWeight: 600,
+              color: activeTab === tab.id ? 'var(--primary-600)' : 'var(--text-muted)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--primary-600)' : '2px solid transparent',
+              marginBottom: '-2px'
+            }}
+          >
+            {tab.icon} {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* 4. Main Operational Section: Dosing Tab */}
+      {activeTab === 'dosing' && (
+        <div style={{ display: 'grid', gridTemplateColumns: '1.15fr 1.25fr', gap: '20px' }}>
         {/* Left Column: Châm dinh dưỡng vào bể */}
         <div className="clean-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <div className="card-header" style={{ marginBottom: 0 }}>
@@ -476,7 +548,151 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
           </div>
         </div>
 
-      </div>
+        </div>
+      )}
+
+      {/* Channels Tab */}
+      {activeTab === 'channels' && (
+        <div className="clean-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="card-header" style={{ marginBottom: 0 }}>
+            <div>
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Layers size={18} color="var(--primary-600)" />
+                <span>Máng trồng của {selectedRes.name.split('-')[0].trim()}</span>
+              </h3>
+              <p className="card-subtitle">
+                Mỗi máng gắn với 1 lô cây. Một bể có thể cấp dung dịch cho nhiều lô đồng thời.
+              </p>
+            </div>
+            <span className="badge badge-neutral">
+              {resChannels.filter(c => c.status === 'active').length} máng đang hoạt động
+            </span>
+          </div>
+
+          {/* Channel table */}
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8125rem' }}>
+              <thead>
+                <tr style={{ backgroundColor: 'var(--bg-subtle)' }}>
+                  {['Máng', 'Lô cây', 'Giống', 'Số slot', 'Cây đang trồng', 'Trạng thái', 'Ghi chú'].map(h => (
+                    <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 600, color: 'var(--text-muted)', fontSize: '0.75rem', borderBottom: '1px solid var(--border-subtle)', whiteSpace: 'nowrap' }}>
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {resChannels.map((ch, idx) => {
+                  const batch = batches.find(b => b.id === ch.batchId);
+                  const occupancy = ch.slotCount > 0 ? Math.round((ch.activePlants / ch.slotCount) * 100) : 0;
+                  return (
+                    <tr key={ch.id} style={{ backgroundColor: idx % 2 === 0 ? '#ffffff' : 'var(--bg-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-main)' }}>{ch.name}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        {batch
+                          ? <span className="mono" style={{ fontSize: '0.75rem', background: 'var(--primary-50)', color: 'var(--primary-700)', padding: '2px 6px', borderRadius: 'var(--radius-sm)' }}>{batch.batchCode}</span>
+                          : <span style={{ color: 'var(--text-subtle)', fontStyle: 'italic' }}>—</span>
+                        }
+                      </td>
+                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)' }}>{batch?.cultivarName || '—'}</td>
+                      <td style={{ padding: '10px 12px', color: 'var(--text-muted)', textAlign: 'center' }}>{ch.slotCount}</td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>{ch.activePlants}</span>
+                          <div style={{ flex: 1, height: '4px', backgroundColor: 'var(--border-subtle)', borderRadius: '2px', minWidth: '50px' }}>
+                            <div style={{ height: '100%', width: `${occupancy}%`, backgroundColor: ch.status === 'empty' ? 'var(--border-medium)' : 'var(--primary-600)', borderRadius: '2px' }} />
+                          </div>
+                          <span style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>{occupancy}%</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span className={`badge ${ch.status === 'active' ? 'badge-success' : ch.status === 'empty' ? 'badge-neutral' : 'badge-warning'}`}>
+                          {ch.status === 'active' ? 'Đang trồng' : ch.status === 'empty' ? 'Trống' : 'Bảo trì'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', color: 'var(--text-subtle)', fontSize: '0.75rem' }}>{ch.notes || '—'}</td>
+                    </tr>
+                  );
+                })}
+                {resChannels.length === 0 && (
+                  <tr>
+                    <td colSpan={7} style={{ padding: '20px 12px', textAlign: 'center', color: 'var(--text-subtle)', fontStyle: 'italic' }}>
+                      Chưa có máng nào được cấu hình cho bể này.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Summary */}
+          {resChannels.length > 0 && (
+            <div style={{ display: 'flex', gap: '20px', padding: '10px 12px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)', fontSize: '0.8rem' }}>
+              <span>Tổng slot: <strong>{resChannels.reduce((s, c) => s + c.slotCount, 0)}</strong></span>
+              <span>Tổng cây đang trồng: <strong>{resChannels.reduce((s, c) => s + c.activePlants, 0)}</strong></span>
+              <span>Máng trống: <strong>{resChannels.filter(c => c.status === 'empty').length}</strong></span>
+              <span>Số lô đang dùng bể này: <strong>{new Set(resChannels.filter(c => c.batchId).map(c => c.batchId)).size}</strong></span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* History Tab */}
+      {activeTab === 'history' && (
+        <div className="clean-card" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <div className="card-header" style={{ marginBottom: 0 }}>
+            <div>
+              <h3 className="card-title" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <History size={18} color="var(--primary-600)" />
+                <span>Lịch sử xả bể — {selectedRes.name.split('-')[0].trim()}</span>
+              </h3>
+              <p className="card-subtitle">
+                Mỗi lần xả & thay dung dịch giữa 2 lô đều được ghi nhận để truy xuất nguồn gốc.
+              </p>
+            </div>
+          </div>
+
+          {resDrainHistory.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-subtle)', fontStyle: 'italic', fontSize: '0.8125rem' }}>
+              Chưa có sự kiện xả bể nào được ghi nhận.
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {resDrainHistory.map(ev => {
+                const reasonLabel: Record<string, string> = {
+                  end_of_batch: 'Kết thúc lô',
+                  scheduled_replacement: 'Thay định kỳ',
+                  contamination: 'Nhiễm bẩn',
+                  other: 'Khác'
+                };
+                return (
+                  <div key={ev.id} style={{ border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <span className="badge badge-warning">{reasonLabel[ev.reason]}</span>
+                        <span style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                          Xả {ev.volumeDrainedLiters}L — {ev.drainDate}
+                        </span>
+                      </div>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Thực hiện: {ev.operator}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '16px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                      <span>pH cuối: <strong>{ev.finalPh}</strong></span>
+                      <span>EC cuối: <strong>{ev.finalEc} mS/cm</strong></span>
+                      <span>DO cuối: <strong>{ev.finalDo} mg/L</strong></span>
+                    </div>
+                    {ev.notes && (
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)', fontStyle: 'italic' }}>
+                        {ev.notes}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Log Measurement Modal */}
       {isLogModalOpen && (
@@ -625,6 +841,104 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
                   className="btn btn-primary"
                 >
                   Xác nhận
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Drain Reservoir Modal */}
+      {isDrainModalOpen && (
+        <div className="modal-overlay" onClick={() => setIsDrainModalOpen(false)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                <Trash2 size={18} color="var(--danger)" style={{ display: 'inline', marginRight: '8px' }} />
+                Xả bể và thay dung dịch — {selectedRes.name.split('-')[0].trim()}
+              </h3>
+              <button 
+                onClick={() => setIsDrainModalOpen(false)}
+                className="btn btn-ghost btn-sm"
+                style={{ fontSize: '1.25rem' }}
+              >
+                ×
+              </button>
+            </div>
+
+            <form onSubmit={handleDrainSubmit}>
+              <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', borderRadius: 'var(--radius-md)', padding: '10px 12px', fontSize: '0.8rem', color: '#92400e' }}>
+                  <strong>Lưu ý:</strong> Thao tác này sẽ xả toàn bộ {selectedRes.currentVolumeLiters}L dung dịch hiện tại. Đảm bảo đã ghi nhận số đo cuối cùng (pH, EC, DO) trước khi xả.
+                </div>
+
+                {/* Current final readings */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', padding: '10px', backgroundColor: 'var(--bg-subtle)', borderRadius: 'var(--radius-md)' }}>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>pH cuối</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{selectedRes.currentPh.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>EC cuối (mS/cm)</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{selectedRes.currentEc.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>DO cuối (mg/L)</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{selectedRes.currentDo.toFixed(2)}</div>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Lý do xả bể</label>
+                  <select 
+                    className="form-select" 
+                    value={drainReason} 
+                    onChange={e => setDrainReason(e.target.value as any)}
+                  >
+                    <option value="end_of_batch">Kết thúc lô trồng</option>
+                    <option value="scheduled_replacement">Thay dung dịch định kỳ</option>
+                    <option value="contamination">Phát hiện nhiễm bẩn / nấm</option>
+                    <option value="other">Lý do khác</option>
+                  </select>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Người thực hiện</label>
+                  <input 
+                    type="text" 
+                    className="form-input" 
+                    value={drainOperator} 
+                    onChange={e => setDrainOperator(e.target.value)} 
+                    required 
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Ghi chú (trạng thái bể, vệ sinh, ...)</label>
+                  <textarea 
+                    className="form-input" 
+                    rows={3}
+                    value={drainNotes} 
+                    onChange={e => setDrainNotes(e.target.value)} 
+                    placeholder="Ví dụ: Bể sạch, không có cặn. Vệ sinh bằng H2O2 0.5% sau đó xả lại bằng nước sạch."
+                  />
+                </div>
+              </div>
+
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  onClick={() => setIsDrainModalOpen(false)} 
+                  className="btn btn-secondary"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn"
+                  style={{ backgroundColor: 'var(--danger)', color: '#ffffff', border: 'none' }}
+                >
+                  Xác nhận xả bể
                 </button>
               </div>
             </form>

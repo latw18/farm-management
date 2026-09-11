@@ -1,4 +1,4 @@
-import type { Cultivar, CropBatch, Reservoir, NutrientFormula, Alert, HarvestRecord } from '../types/farm';
+import type { Cultivar, CropBatch, Reservoir, NutrientFormula, Alert, HarvestRecord, Channel, SolutionDrainEvent } from '../types/farm';
 
 export const INITIAL_CULTIVARS: Cultivar[] = [
   {
@@ -243,35 +243,47 @@ export const INITIAL_ALERTS: Alert[] = [
     id: 'alt-01',
     timestamp: '2026-09-10 10:15',
     severity: 'warning',
+    status: 'open',
     metric: 'EC',
     title: 'EC Bể A tăng nhẹ qua trưa (1.88 mS/cm)',
     message: 'Nồng độ ion hòa tan cao hơn ngưỡng khuyến nghị cho xà lách giai đoạn Seedling (1.5 - 1.8 mS/cm). Cây non có thể bị cháy chóp rễ.',
     reservoirId: 'res-01',
     resolved: false,
-    suggestedAction: 'Châm thêm 40L nước RO/nước sạch để hạ EC về mức 1.70 mS/cm.'
+    suggestedAction: 'Châm thêm 40L nước RO/nước sạch để hạ EC về mức 1.70 mS/cm.',
+    assignedTo: 'Kỹ sư Nông nghiệp'
   },
   {
     id: 'alt-02',
     timestamp: '2026-09-09 14:30',
     severity: 'info',
+    status: 'acknowledged',
     metric: 'System',
     title: 'Lô LET-2026-003 sẵn sàng thu hoạch trong 48-72h',
     message: 'Xà lách Romaine đạt ngày thứ 34. Dự báo AI đạt 228g/cây, khuyến nghị chuẩn bị thu hoạch sớm để tránh trổ ngồng hoặc vị đắng.',
     batchId: 'batch-03',
     resolved: false,
-    suggestedAction: 'Kiểm tra độ giòn lá và lên lịch trình thu hoạch buổi sáng sớm (6:00 - 8:00 AM).'
+    suggestedAction: 'Kiểm tra độ giòn lá và lên lịch trình thu hoạch buổi sáng sớm (6:00 - 8:00 AM).',
+    assignedTo: 'Quản lý Trang trại',
+    acknowledgedBy: 'Quản lý Trang trại',
+    acknowledgedAt: '2026-09-09 15:00'
   },
   {
     id: 'alt-03',
     timestamp: '2026-09-07 15:45',
     severity: 'critical',
+    status: 'resolved',
     metric: 'DO',
     title: 'DO Bể A giảm xuống 5.4 mg/L lúc trời nóng',
     message: 'Nhiệt độ nước vượt 24.5°C làm giảm độ hòa tan của oxy trong nước. Nguy cơ yếm khí vùng rễ.',
     reservoirId: 'res-01',
     resolved: true,
     suggestedAction: 'Bật máy sục khí phụ trợ và bổ sung nước mát hạ nhiệt độ bồn chứa.',
-    resolvedAt: '2026-09-07 16:30'
+    assignedTo: 'Kỹ sư Nông nghiệp',
+    acknowledgedBy: 'Kỹ sư Nông nghiệp',
+    acknowledgedAt: '2026-09-07 15:50',
+    resolvedBy: 'Kỹ sư Nông nghiệp',
+    resolvedAt: '2026-09-07 16:30',
+    resolutionNote: 'Đã bật thêm máy sục khí dự phòng và châm 50L nước mát. DO trở về 6.8 mg/L sau 45 phút.'
   }
 ];
 
@@ -307,5 +319,52 @@ export const INITIAL_HARVESTS: HarvestRecord[] = [
     differencePercent: -2.35,
     grade: 'A',
     notes: 'Tán lá đều đẹp, đạt chuẩn siêu thị sạch.'
+  }
+];
+
+// Channels (máng trồng) — trung gian giữa Reservoir và Batch
+export const INITIAL_CHANNELS: Channel[] = [
+  // Bể 01 — 4 máng
+  { id: 'ch-01', name: 'Máng NFT A1', reservoirId: 'res-01', batchId: 'batch-01', slotCount: 100, activePlants: 162, status: 'active', notes: 'Tầng 1, hàng trái' },
+  { id: 'ch-02', name: 'Máng NFT A2', reservoirId: 'res-01', batchId: 'batch-01', slotCount: 100, activePlants: 160, status: 'active', notes: 'Tầng 1, hàng phải' },
+  { id: 'ch-03', name: 'Máng NFT A3', reservoirId: 'res-01', batchId: 'batch-01', slotCount: 100, activePlants: 160, status: 'active', notes: 'Tầng 2, hàng trái' },
+  { id: 'ch-04', name: 'Máng NFT A4', reservoirId: 'res-01', batchId: 'batch-01', slotCount: 100, activePlants: 160, status: 'active', notes: 'Tầng 2, hàng phải' },
+  { id: 'ch-05', name: 'Máng NFT A5', reservoirId: 'res-01', batchId: 'batch-02', slotCount: 100, activePlants: 248, status: 'active', notes: 'Tầng 3, hàng trái — Batavia mới chuyển' },
+  { id: 'ch-06', name: 'Máng NFT A6', reservoirId: 'res-01', batchId: 'batch-02', slotCount: 100, activePlants: 247, status: 'active', notes: 'Tầng 3, hàng phải — Batavia mới chuyển' },
+  // Bể 02 — 4 máng
+  { id: 'ch-07', name: 'Máng NFT B1', reservoirId: 'res-02', batchId: 'batch-03', slotCount: 120, activePlants: 197, status: 'active', notes: 'Tầng 1 — Romaine sắp thu hoạch' },
+  { id: 'ch-08', name: 'Máng NFT B2', reservoirId: 'res-02', batchId: 'batch-03', slotCount: 120, activePlants: 196, status: 'active', notes: 'Tầng 2 — Romaine sắp thu hoạch' },
+  { id: 'ch-09', name: 'Máng NFT B3', reservoirId: 'res-02', batchId: 'batch-03', slotCount: 120, activePlants: 196, status: 'active', notes: 'Tầng 3 — Romaine sắp thu hoạch' },
+  { id: 'ch-10', name: 'Máng NFT B4', reservoirId: 'res-02', batchId: 'batch-03', slotCount: 120, activePlants: 196, status: 'active', notes: 'Tầng 4 — Romaine sắp thu hoạch' },
+  { id: 'ch-11', name: 'Máng NFT B5', reservoirId: 'res-02', batchId: undefined, slotCount: 120, activePlants: 0, status: 'empty', notes: 'Đang trống, chuẩn bị cho lô mới' },
+];
+
+// Solution Drain Events — lịch sử xả bể
+export const INITIAL_DRAIN_EVENTS: SolutionDrainEvent[] = [
+  {
+    id: 'drain-01',
+    reservoirId: 'res-01',
+    batchId: 'batch-old-01',
+    drainDate: '2026-08-15',
+    volumeDrainedLiters: 580,
+    finalPh: 6.1,
+    finalEc: 1.45,
+    finalDo: 6.2,
+    reason: 'end_of_batch',
+    operator: 'Kỹ sư Nguyễn',
+    notes: 'Kết thúc lô LET-2026-000A. Bể sạch, không có cặn. Vệ sinh bằng H2O2 0.5% sau đó xả lại bằng nước sạch.'
+  },
+  {
+    id: 'drain-02',
+    reservoirId: 'res-02',
+    batchId: 'batch-old-02',
+    drainDate: '2026-08-21',
+    volumeDrainedLiters: 950,
+    finalPh: 6.3,
+    finalEc: 1.38,
+    finalDo: 5.9,
+    reason: 'end_of_batch',
+    operator: 'Kỹ sư Trần',
+    notes: 'Kết thúc lô LET-2026-000B. Phát hiện cặn trắng nhẹ đáy bể, đã vệ sinh bằng acid citric 1%.'
   }
 ];

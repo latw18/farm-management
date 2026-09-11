@@ -414,11 +414,144 @@ Cần lưu:
 - số cây
 - diện tích/mật độ
 - hệ thống
-- reservoir
 - growth stage
 - trạng thái
 
 > MVP nên quản lý theo **batch/lô**, không cần quản lý từng cây riêng lẻ.
+
+> **Lưu ý quan trọng:** Batch **không** lưu trực tiếp `reservoir_id`. Quan hệ giữa Batch và Reservoir được thể hiện thông qua entity trung gian **Channel (máng trồng)**. Xem chi tiết tại mục 10A.
+
+---
+
+# 10A. Quan hệ Reservoir ↔ Channel ↔ Batch
+
+## Vấn đề nếu gắn trực tiếp Batch → Reservoir
+
+Trong thực tế trang trại NFT, một bể dung dịch bơm nước lên **nhiều máng (channel)** đồng thời. Mỗi máng có thể thuộc các lô cây khác nhau (gieo ngày khác nhau, giống khác nhau). Nếu thiết kế `batch.reservoir_id` trực tiếp:
+
+- Không thể biết bể đang phục vụ bao nhiêu lô.
+- Khi đo EC/pH ở bể, không rõ dữ liệu đó áp dụng cho lô nào.
+- Không thể mô tả lô lớn trải trên nhiều máng của nhiều bể khác nhau.
+
+## Giải pháp: Thêm entity Channel (Máng trồng)
+
+```text
+Reservoir 01
+    ├── Channel/Máng 01  →  Batch LET-2026-001  (máng 1)
+    ├── Channel/Máng 02  →  Batch LET-2026-001  (máng 2)
+    ├── Channel/Máng 03  →  Batch LET-2026-002  (máng 3)
+    └── Channel/Máng 04  →  Batch LET-2026-002  (máng 4)
+
+Reservoir 02
+    ├── Channel/Máng 05  →  Batch LET-2026-001  (máng 5)
+    └── Channel/Máng 06  →  (trống, chưa có lô)
+```
+
+## Quan hệ giữa các entity
+
+```text
+Reservoir  1 ──────────── nhiều  Channel
+Batch      1 ──────────── nhiều  Channel
+Channel    nhiều ───────── 1     Reservoir
+Channel    nhiều ───────── 1     Batch (hoặc NULL nếu trống)
+```
+
+Tóm lại:
+
+- **Reservoir** là nguồn dung dịch vật lý. Đo pH/EC/DO ở đây.
+- **Channel** là máng trồng vật lý. Gắn với 1 Reservoir và 1 Batch tại mỗi thời điểm.
+- **Batch** là lô cây logic. Có thể trải trên nhiều Channel, nhiều Reservoir.
+
+## Thông tin Channel cần lưu
+
+- channel_id
+- reservoir_id (bể đang cấp dung dịch)
+- batch_id (lô đang trồng, nullable)
+- channel_position (vị trí máng trong hệ thống)
+- slot_count (số vị trí trồng)
+- active_plants (số cây đang trên máng)
+- status (active / empty / maintenance)
+- notes
+
+## Giả định MVP
+
+Nếu trang trại nhỏ và chỉ có 1 bể – 1 lô tại một thời điểm, có thể đơn giản hóa thành quan hệ **1 Reservoir ↔ 1 Batch đang active**. Tuy nhiên phải ghi rõ giả định này trong tài liệu thiết kế để tránh phải refactor khi trang trại mở rộng.
+
+---
+
+# 10B. Luồng thay dung dịch giữa các lô
+
+## Vòng đời dung dịch trong Reservoir
+
+Dung dịch dinh dưỡng trong bể không dùng mãi mãi. Sau một lô hoặc sau một khoảng thời gian nhất định, bể phải được xả, vệ sinh và pha lại. Đây là **sự kiện Solution Replacement** — khác hoàn toàn với việc bổ sung thêm phân (Nutrient Dosing).
+
+## Trạng thái Reservoir theo vòng đời lô
+
+```text
+[Bể trống / vừa vệ sinh]
+        │
+        ▼
+[Pha dung dịch mới]  ← NutrientMixingEvent
+        │
+        ▼
+[Đang phục vụ Batch]
+        │
+        ├── Bổ sung phân ←── NutrientDosingEvent
+        ├── Điều chỉnh pH ← PHAdjustmentEvent
+        ├── Bổ sung nước ← WaterTopUpEvent
+        ├── Lấy mẫu / Lab ← SamplingEvent
+        │
+        ▼
+[Batch kết thúc / thu hoạch]
+        │
+        ▼
+[Xả bể]  ← SolutionDrainEvent
+        │
+        ▼
+[Vệ sinh bể]  ← SanitationEvent
+        │
+        ▼
+[Bể trống / sẵn sàng cho lô tiếp theo]
+```
+
+## Dữ liệu bắt buộc lưu khi thay dung dịch
+
+### Khi xả (SolutionDrainEvent)
+
+- reservoir_id
+- batch_id đang kết thúc
+- drain_date
+- volume_drained (lít)
+- final_pH / final_EC / final_DO (đo trước khi xả)
+- reason (end_of_batch / scheduled_replacement / contamination / other)
+- operator
+- notes
+
+### Khi pha lại (NutrientMixingEvent)
+
+- reservoir_id
+- batch_id sắp bắt đầu (có thể null nếu chưa gán lô)
+- mix_date
+- water_volume (lít)
+- water_source
+- nutrient_formula_id
+- stock_a_volume (ml)
+- stock_b_volume (ml)
+- additional_inputs (các chất bổ sung khác)
+- target_pH / target_EC
+- final_pH / final_EC (đo sau khi pha xong)
+- operator
+- notes
+
+## Tại sao quan trọng
+
+Nếu không lưu sự kiện này, hệ thống không thể trả lời:
+
+- Lô LET-2026-003 được bắt đầu với dung dịch pha từ ngày nào?
+- Công thức pha có khác lô trước không?
+- Bể đã được vệ sinh trước khi pha lại chưa?
+
+Đây là dữ liệu truy xuất nguồn gốc quan trọng nếu sau này muốn giải thích tại sao hai lô cùng giống nhưng năng suất khác nhau.
 
 ---
 
@@ -764,6 +897,123 @@ Cách này dễ giải thích và đúng với hệ thống hỗ trợ quyết �
 
 ---
 
+# 21A. Quản lý cảnh báo – Alert Lifecycle
+
+## Vấn đề nếu chỉ tạo cảnh báo mà không quản lý
+
+Rule Engine sinh ra cảnh báo khi pH lệch ngưỡng. Nhưng nếu hệ thống không theo dõi cảnh báo đó được xử lý chưa, ai xử lý, xử lý bằng cách nào — thì cảnh báo chỉ là thông báo một chiều, không có giá trị vận hành.
+
+## Vòng đời một cảnh báo
+
+```text
+[Điều kiện vi phạm ngưỡng]
+        │
+        ▼
+[Alert tạo ra]  ←── status: OPEN
+        │
+        ▼
+[Gửi thông báo đến người nhận]
+        │
+        ▼
+[Người nhận xác nhận đã thấy]  ←── status: ACKNOWLEDGED
+        │
+        ▼
+[Người nhận xử lý sự cố]
+        │
+        ├── [Xử lý xong, ghi lại]  ←── status: RESOLVED
+        │
+        └── [Không xử lý trong X phút]  ←── Escalate lên cấp trên
+                │
+                ▼
+        [Alert leo thang]  ←── status: ESCALATED
+```
+
+## Phân loại cảnh báo theo mức độ
+
+| Mức | Tên | Ví dụ | Cần xử lý trong |
+|---|---|---|---|
+| 1 | INFO | EC gần ngưỡng dưới | Trong ca làm việc |
+| 2 | WARNING | pH lệch khỏi target ± 0.3 | Trong 2 giờ |
+| 3 | CRITICAL | DO < 4 mg/L, bơm dừng | Ngay lập tức |
+
+## Ai nhận cảnh báo
+
+```text
+Mức INFO / WARNING
+    → Agricultural Engineer của ca đang trực
+
+Mức CRITICAL
+    → Agricultural Engineer (ngay lập tức)
+    → Farm Manager (đồng thời)
+
+Nếu không ACKNOWLEDGE trong 30 phút (CRITICAL)
+    → Leo thang lên Farm Manager + Admin
+```
+
+Trong MVP không cần push notification thật. Có thể hiển thị trong Alert Center trên giao diện và đánh dấu badge số lượng chưa xử lý.
+
+## Thông tin Alert cần lưu
+
+- alert_id
+- reservoir_id hoặc batch_id (nguồn gốc)
+- alert_type (pH_low / pH_high / EC_low / EC_high / DO_low / temp_high / ...)
+- severity (INFO / WARNING / CRITICAL)
+- triggered_value (giá trị đo được khi kích hoạt)
+- threshold_value (ngưỡng bị vi phạm)
+- triggered_at (thời điểm tạo)
+- status (OPEN / ACKNOWLEDGED / RESOLVED / ESCALATED)
+- assigned_to (user nhận cảnh báo)
+- acknowledged_by / acknowledged_at
+- resolved_by / resolved_at
+- resolution_action (mô tả hành động xử lý)
+- escalated_to / escalated_at
+- notes
+
+## Luồng xử lý từng loại cảnh báo phổ biến
+
+### pH thấp (pH_low)
+
+```text
+1. Kiểm tra pH meter có bị lỗi không (calibration)
+2. Xác nhận đọc lại bằng thiết bị dự phòng
+3. Thêm pH Up (KOH hoặc K2SiO3) theo lượng tính toán
+4. Đợi 15 phút, đo lại
+5. Ghi nhận lượng đã dùng vào PHAdjustmentEvent
+6. Đánh dấu RESOLVED nếu pH về ngưỡng
+```
+
+### EC thấp (EC_low)
+
+```text
+1. Kiểm tra mực nước bể (có thể nước bốc hơi làm loãng dung dịch)
+2. Nếu mực nước ổn: bổ sung Stock A + B theo công thức
+3. Nếu mực nước thấp: bổ sung nước trước, sau đó bổ sung dinh dưỡng
+4. Đo lại EC sau 20 phút
+5. Ghi nhận NutrientDosingEvent hoặc WaterTopUpEvent
+6. Đánh dấu RESOLVED
+```
+
+### DO thấp (DO_low) — CRITICAL
+
+```text
+1. Kiểm tra ngay máy sục khí / air pump còn chạy không
+2. Kiểm tra nhiệt độ dung dịch (nhiệt cao làm giảm DO)
+3. Nếu pump hỏng: kích hoạt pump dự phòng hoặc sục khí thủ công ngay
+4. Nếu nhiệt độ cao: kiểm tra chiller, che nắng bể
+5. Ghi nhận sự cố thiết bị nếu có
+6. Đánh dấu RESOLVED sau khi DO > 6 mg/L trở lại
+```
+
+## Suppression – tránh spam cảnh báo
+
+Nếu điều kiện vi phạm liên tục (ví dụ EC thấp kéo dài 3 tiếng), hệ thống không nên tạo hàng trăm alert giống nhau. Cần có logic:
+
+- Mỗi loại cảnh báo chỉ tạo 1 alert OPEN tại một thời điểm cho cùng một Reservoir.
+- Alert mới chỉ được tạo khi alert cũ đã RESOLVED.
+- Nếu điều kiện vẫn vi phạm sau khi mark RESOLVED nhưng không có hành động thực sự thay đổi, hệ thống tạo lại với note "Recurrence".
+
+---
+
 # 22. Dataset đề xuất
 
 ## 22.1. Hydroponic Farming Data – Mendeley Data (2025)
@@ -1043,7 +1293,7 @@ Farm
 Zone
 
 HydroponicSystem
-Channel / Raft
+Channel          ← entity trung gian Reservoir ↔ Batch
 Reservoir
 
 Crop
@@ -1063,7 +1313,11 @@ NutrientMixingEvent
 NutrientDosingEvent
 WaterTopUpEvent
 PHAdjustmentEvent
+SolutionDrainEvent   ← mới: sự kiện xả bể khi kết thúc lô
 SolutionReplacementEvent
+SanitationEvent      ← mới: vệ sinh bể sau khi xả
+Sampling
+LaboratoryAnalysis
 
 WaterSource
 WaterAnalysis
@@ -1076,12 +1330,15 @@ PestDiseaseRecord
 
 Harvest
 
+Alert              ← có đầy đủ lifecycle: OPEN → ACK → RESOLVED → ESCALATED
+AlertAssignment    ← ai nhận cảnh báo
+AlertEscalation    ← leo thang lên ai, khi nào
+
 Equipment
 Maintenance
 Calibration
 Sanitation
 
-Alert
 AIPrediction
 Report
 ```
@@ -1245,13 +1502,14 @@ Sau khi core ổn mới làm:
 Crop + Cultivar + Growth Stage
              ↓
 [2] HỆ THỐNG
-NFT / DWC + Reservoir
+NFT / DWC + Reservoir + Channel (máng)
              ↓
 [3] NƯỚC
 pH + EC + DO + Water Temperature
              ↓
 [4] DINH DƯỠNG
 N P K Ca Mg S + Micronutrients
++ Vòng đời dung dịch: Pha → Bổ sung → Xả → Vệ sinh → Pha lại
              ↓
 [5] MÔI TRƯỜNG
 Temperature + Humidity + Light
@@ -1261,9 +1519,12 @@ Age + Leaf + Weight + kg/batch
              ↓
 [7] AI
 Yield Prediction + Warning/Anomaly
+             ↓
+[8] CẢNH BÁO
+Rule Engine → Alert → Giao cho kỹ sư → Xử lý → Ghi nhận → Đóng
 ```
 
-Nếu 7 phần này đúng thì lõi của đề tài đã đúng.
+Nếu 8 phần này đúng thì lõi của đề tài đã đúng.
 
 ---
 
