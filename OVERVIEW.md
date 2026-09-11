@@ -68,13 +68,12 @@ Hệ thống cần quản lý:
 - Thể tích/mực nước
 - Raft
 - Air pump / hệ thống sục khí
-- DO – oxy hòa tan
 - pH
 - EC
 - Nhiệt độ dung dịch
 - Lô cây
 
-> Với DWC, **DO đặc biệt quan trọng** vì rễ nằm trực tiếp trong dung dịch.
+> Với DWC, rễ cây tiếp xúc trực tiếp với dung dịch nên việc kiểm soát thể tích, pH, EC và nhiệt độ dung dịch là rất quan trọng.
 
 ---
 
@@ -226,26 +225,7 @@ Muốn biết từng nguyên tố phải dựa vào công thức pha, lịch b�
 
 ---
 
-## 5.3. DO – Dissolved Oxygen
-
-Đơn vị:
-
-**mg/L hoặc ppm**
-
-DO thể hiện lượng oxy hòa tan trong nước.
-
-Cần lưu:
-
-- DO hiện tại
-- mức cảnh báo
-- thời gian đo
-- lịch sử DO
-
-Missouri Extension đưa ra **> 6 ppm** như một mức tốt để đánh giá nguồn nước/hệ thủy canh.
-
----
-
-## 5.4. Nhiệt độ dung dịch
+## 5.3. Nhiệt độ dung dịch
 
 Lưu:
 
@@ -561,28 +541,21 @@ Nên là entity riêng.
 
 Thông tin:
 
-- Reservoir ID
-- system
-- capacity
-- current volume
-- nutrient formula
-- current pH
-- current EC
-- current DO
-- water temperature
-- last replacement date
+- Reservoir ID & Tên bể
+- Hệ sinh thái/hệ thống cấp (NFT, DWC)
+- Dung tích thiết kế (`capacityLiters`)
+- Thể tích dung dịch hiện tại (`currentVolumeLiters`) & Tỷ lệ % thể tích
+- Công thức dinh dưỡng đang áp dụng (`activeFormula`)
+- Chỉ số hiện tại: **pH, EC, Nhiệt độ nước** (bộ 3 chỉ số thiết yếu)
+- Trạng thái bơm tuần hoàn (Đang chạy / Tạm dừng)
+- Lần châm nước / thay dung dịch gần nhất
 
-Các sự kiện liên quan:
+Các sự kiện & tính năng vận hành:
 
-- Mixing
-- Nutrient dosing
-- Water top-up
-- pH adjustment
-- Drain
-- Refill
-- Solution replacement
-- Sampling
-- Laboratory analysis
+- **Dosing Calculator & Xác nhận châm phân**: Tính toán lượng dung dịch mẹ Can A và Can B (ml) cần châm bù dựa trên chênh lệch EC mục tiêu và thể tích bể hiện tại. Hỗ trợ nút **"Xác nhận đã châm phân"** để tự động cập nhật nồng độ EC và thể tích bồn trong hệ thống.
+- **Chuyển đổi công thức dinh dưỡng**: Cho phép lựa chọn linh hoạt giữa các công thức dinh dưỡng (Công thức thương mại, Cây con, v.v.), tự động render danh sách chi tiết các muối khoáng thành phần của Can A và Can B.
+- **Châm nước bổ sung (Top-up)**: Ghi nhận lượng nước sạch bổ sung và tự động tính toán lại mức pha loãng EC.
+- **Ghi nhận số đo chất lượng nước (Manual / Sensor)**: Ghi nhận pH, EC, Nhiệt độ nước với nguồn đo tương ứng.
 
 ---
 
@@ -590,42 +563,37 @@ Các sự kiện liên quan:
 
 Mỗi lần pha cần lưu:
 
-- nước bao nhiêu L;
-- nguồn nước;
-- formula;
-- Stock A bao nhiêu;
-- Stock B bao nhiêu;
-- phân/chất bổ sung khác;
-- pH trước/sau;
-- EC trước/sau;
-- người thực hiện;
-- thời gian.
+- Thể tích nước bổ sung (L);
+- Nguồn nước sử dụng;
+- Công thức dinh dưỡng (`formula`);
+- Lượng dung dịch Stock A (ml);
+- Lượng dung dịch Stock B (ml);
+- Phân/chất bổ sung khác (pH Up / pH Down);
+- pH trước / sau xử lý;
+- EC trước / sau xử lý;
+- Người thực hiện;
+- Thời gian ghi nhận.
 
-Mỗi lần bổ sung cũng nên tạo event riêng.
-
-Đây là dữ liệu rất quan trọng nếu sau này muốn giải thích sự khác biệt năng suất giữa các lô.
+Hệ thống cung cấp cơ chế tính toán nồng độ châm phân bù EC:
+$$\text{Dose (ml per stock)} = \frac{(\text{EC}_{\text{target}} - \text{EC}_{\text{current}}) \times \text{Current Volume (L)}}{0.1} \times 10$$
+Kỹ sư sau khi châm dung dịch có thể bấm nút **Xác nhận đã châm phân** để đồng bộ ngay dữ liệu vào bể chứa.
 
 ---
 
 # 13. Theo dõi sinh trưởng
 
-Kỹ sư có thể lấy mẫu định kỳ.
+Kỹ sư lấy mẫu định kỳ trên lô cây trồng để lưu vào bản ghi **CropObservation**:
 
-Tối thiểu:
+Thông số đo đạc tối thiểu:
 
-- Plant age
-- Plant height
-- Leaf count
-- Sample fresh weight
+- Ngày ghi nhận (`date`);
+- Tuổi cây tính từ ngày gieo (`plantAgeDays`);
+- Chiều cao cây trung bình (`avgHeightCm`);
+- Số lá thật trung bình (`avgLeafCount`);
+- Khối lượng tươi mẫu thử (`sampleWeightG`);
+- Ghi chú sinh lý (`notes` - ví dụ: chóp lá cháy nhẹ, rễ trắng khỏe).
 
-Có thể mở rộng:
-
-- canopy diameter
-- leaf area
-- root length
-- dry weight
-- chlorophyll/SPAD
-- ảnh cây
+Dữ liệu `CropObservation` mới nhất được gắn trực tiếp vào lô trồng (`batch.lastObservation`) và đóng vai trò là feature hình thái sinh học quan trọng cho mô hình AI dự báo năng suất.
 
 ---
 
@@ -715,7 +683,6 @@ Các thiết bị có thể quản lý:
 
 - pH meter
 - EC meter
-- DO meter
 - Temperature sensor
 - Humidity sensor
 - Light meter
@@ -728,7 +695,7 @@ Các thiết bị có thể quản lý:
 
 ## Calibration
 
-Đặc biệt với pH/EC/DO meter cần lưu:
+Đặc biệt với pH/EC meter cần lưu:
 
 - device;
 - calibration date;
@@ -745,28 +712,33 @@ Dữ liệu từ thiết bị không được hiệu chuẩn có thể khiến t
 
 Bắt buộc lưu vì đây là **ground truth cho AI**.
 
-- Harvest date
-- Number of plants harvested
-- Total fresh weight
-- Average fresh weight/plant
-- Marketable weight
-- Rejected weight
-- Loss %
-- Grade
+Mỗi bản ghi thu hoạch (`HarvestRecord`) lưu trữ:
+- Ngày thu hoạch (`harvestDate`)
+- Số cây thu hoạch thực tế (`harvestedPlants`)
+- Tổng khối lượng tươi (`totalWeightKg`)
+- Khối lượng bình quân mỗi cây (`avgWeightG`)
+- Khối lượng loại bỏ / không đạt chuẩn (`rejectedWeightKg`)
+- Tỷ lệ hao hụt (`lossPercentage` %)
+- Phân hạng chất lượng thương phẩm (`grade`: A, B, C)
+- **Dự báo AI đối chứng (`aiPredictedWeightG`)**: Giá trị khối lượng do mô hình AI dự báo tại ngày thu hoạch thực tế.
+- **Độ lệch thực tế vs AI (`differencePercent` %)**: Đo lường độ chính xác của mô hình dự báo.
 
-Các KPI:
+Các KPI cốt lõi:
 
-- `g/plant`
-- `kg/batch`
-- `kg/m²`
+- `g/plant` (trọng lượng búp tươi trung bình)
+- `kg/batch` (sản lượng tổng trên lô)
+- `kg/m²` (năng suất trên đơn vị diện tích)
 
 Ví dụ:
 
 ```text
 Batch: LET-2026-001
-Harvested plants: 480
-Average weight: 190 g/plant
-Total harvest: 91.2 kg
+Harvested plants: 480 cây
+Actual avg weight: 195 g/cây
+AI predicted weight: 190 g/cây
+Difference: +2.6% (rất sát với thực tế)
+Total harvest: 93.6 kg
+Grade: A
 ```
 
 ---
@@ -785,52 +757,61 @@ Sau đó hệ thống tính:
 
 **Estimated Batch Yield = Predicted Weight × Expected Harvestable Plants**
 
-### Feature có thể sử dụng
+### Cơ chế thuật toán mô phỏng (Agronomic-Calibrated Simulator)
 
-Tùy dataset thực tế:
+Mô hình tích hợp nguyên lý nông học thực nghiệm (Frontiers in Plant Science 2022 & Mendeley Dataset):
+1. **Đường cong sinh trưởng Sigmoidal theo giống (`Cultivar`)**:
+   - Sử dụng `targetCycleDays` (chu kỳ ngày tuổi chuẩn của giống: 35-42 ngày) và `expectedWeightG` (khối lượng thương phẩm mục tiêu: 180-230g).
+   - Điểm uốn sinh trưởng tối ưu được thiết lập động: $\text{inflectionDay} = \text{targetCycleDays} \times 0.66$.
+2. **Hệ số điều chỉnh hình thái sinh học**:
+   - Kết hợp tỷ lệ số lá thật (`leafCount`) và chiều cao cây (`plantHeightCm`) so với ngưỡng chuẩn sinh học theo độ tuổi.
+3. **Hệ số phạt/thưởng môi trường dung dịch & vi khí hậu**:
+   - Kiểm tra độ lệch nồng độ EC (chuẩn 1.5 - 1.85 mS/cm).
+   - Kiểm tra độ pH dung dịch (chuẩn 5.6 - 6.2).
+   - Kiểm tra nhiệt độ nước bồn chứa (tối ưu 19 - 23°C; phạt mạnh nếu > 24.5°C do rủi ro thối rễ).
+4. **Phân tích đóng góp đặc trưng (`FeatureContribution`)**:
+   - Động hóa mức độ quan trọng (%) của từng yếu tố môi trường và sinh học.
+   - Chuẩn hóa tổng trọng số của tất cả các đặc trưng đạt chính xác **100%**.
 
-- crop/cultivar
-- age
-- growth stage
-- pH
-- EC
-- DO
-- water temperature
-- air temperature
-- humidity
-- PPFD/DLI
-- water consumption
-- nutrient information
-- plant density
-- leaf count
-- plant height
-- sample weight
+### Feature sử dụng
+
+- Thông tin giống (`cultivarName`, `targetCycleDays`, `expectedWeightG`)
+- Độ tuổi cây (`plantAgeDays`)
+- Số lá trung bình (`leafCount`)
+- Chiều cao cây (`plantHeightCm`)
+- Nồng độ dinh dưỡng dung dịch (`avgEc`)
+- Độ pH dung dịch (`avgPh`)
+- Nhiệt độ nước bồn (`avgWaterTemp`)
+- Số lượng cây kỳ vọng (`expectedPlants`)
 
 ### Output
 
 Ví dụ:
 
 ```text
-Predicted fresh weight: 190 g/plant
+Cultivar: Green Oak Lettuce
+Plant age: 28 days
+Predicted fresh weight: 192.4 g/plant
 Expected harvestable plants: 480
-Estimated batch yield: 91.2 kg
+Estimated batch yield: 92.35 kg
+Confidence (R²): 0.94
+Risk Score: Low
+Top feature contribution: Nồng độ EC (28%), Số lá thật (26%), Nhiệt độ nước (22%), Chiều cao (14%), pH (10%)
 ```
 
-### Model có thể thử
+### Model có thể thử nghiệm khi huấn luyện với Big Data
 
-- Linear Regression – baseline
-- Random Forest
-- XGBoost
-- SVR
-- Neural Network
+- Linear / Ridge Regression – baseline
+- Random Forest Regressor
+- XGBoost Regressor (tối ưu nhất trên bảng dữ liệu dạng tabular)
+- SVR (Support Vector Regression)
+- Deep Learning (MLP / LSTM nếu theo chuỗi thời gian)
 
 Đánh giá bằng:
 
-- MAE
-- RMSE
-- R²
-
-Không chọn model chỉ vì “xịn hơn”; chọn model có kết quả validation/test tốt và giải thích được.
+- MAE (Mean Absolute Error)
+- RMSE (Root Mean Squared Error)
+- R² Score (hệ số xác định)
 
 ---
 
@@ -840,7 +821,6 @@ Có thể dùng:
 
 - pH
 - EC
-- DO
 - water temperature
 - air temperature
 - humidity
@@ -861,7 +841,6 @@ WARNING
 
 - EC above target
 - Water temperature high
-- DO low
 ```
 
 ---
@@ -870,30 +849,43 @@ WARNING
 
 Không nên ép mọi cảnh báo thành Machine Learning.
 
-## Rule Engine
+## Rule Engine (Hệ luật cảnh báo ngưỡng tức thì)
 
-Ví dụ:
+Rule Engine chịu trách nhiệm bắt các sự kiện vượt ngưỡng lý hóa ngay lập tức khi phát sinh số đo:
 
 ```text
-IF pH < crop_stage.min_pH
-→ LOW PH WARNING
+// 1. Cảnh báo tụt dinh dưỡng EC
+IF EC < 1.3 mS/cm
+→ WARNING [EC]: Nồng độ dinh dưỡng quá thấp. Khuyến nghị châm thêm Can A và Can B theo tỷ lệ 1:1.
 
-IF EC > crop_stage.max_EC
-→ HIGH EC WARNING
+// 2. Cảnh báo dư dinh dưỡng EC
+IF EC > 2.0 mS/cm
+→ WARNING [EC]: Nồng độ muối khoáng quá cao. Cần châm thêm nước sạch để hạ EC tránh ngộ độc rễ.
 
-IF DO < configured_min_DO
-→ LOW DO WARNING
+// 3. Cảnh báo pH lệch ngưỡng
+IF pH < 5.5
+→ WARNING [pH]: Nước bị chua. Khuyến nghị châm dung dịch pH Up (KOH).
+IF pH > 6.5
+→ WARNING [pH]: Nước bị kiềm hóa, cản trở hấp thu vi lượng. Khuyến nghị châm pH Down (H3PO4/HNO3).
+
+// 4. Cảnh báo nhiệt độ nước bồn quá cao
+IF Water Temperature > 24.5°C
+→ CRITICAL [Temp]: Nhiệt độ nước quá ấm, tăng nguy cơ bùng phát nấm rễ Pythium và thối rễ. Cần kích hoạt quạt giải nhiệt hoặc chiller làm mát bồn.
 ```
 
-## AI
+**Cơ chế chống spam thông báo (Alert Deduplication)**:
+- Khi một chỉ số vượt ngưỡng, hệ thống kiểm tra danh sách cảnh báo chưa xử lý (`!resolved`).
+- Nếu đã tồn tại cảnh báo cho cùng một chỉ số trên cùng một bể chứa, hệ thống sẽ bỏ qua thay vì liên tục tạo thêm thông báo rác làm loãng màn hình vận hành.
+
+## AI (Trí tuệ nhân tạo)
 
 Dùng cho:
 
-- Yield Prediction
-- Anomaly Detection
-- các pattern phức tạp trong dữ liệu
+- **Yield Prediction**: Dự báo sản lượng tươi tại thời điểm thu hoạch dựa trên kết hợp đa chiều giữa tuổi cây, hình thái sinh học (số lá, chiều cao) và lịch sử lý hóa.
+- **Anomaly Detection & Condition Warning**: Phát hiện các dạng bất thường tiềm ẩn nhiều biến số không thể quy chụp bằng luật ngưỡng đơn lẻ.
+- Tự động đánh giá và tính toán tỷ lệ đóng góp đặc trưng (`featureContributions`) giúp kỹ sư nông nghiệp hiểu rõ nguyên nhân ảnh hưởng đến sinh trưởng.
 
-Cách này dễ giải thích và đúng với hệ thống hỗ trợ quyết định.
+Cách phân tách này giúp hệ thống vận hành minh bạch, dễ giải thích và đúng với bản chất của một **Hệ Thống Hỗ Trợ Quyết Định (Decision Support System - DSS)**.
 
 ---
 
@@ -1175,7 +1167,7 @@ https://www.frontiersin.org/journals/plant-science/articles/10.3389/fpls.2022.70
 
 - crop;
 - nutrient formula;
-- pH/EC/DO;
+- pH/EC/nhiệt độ nước;
 - môi trường;
 - quan sát cây;
 - cảnh báo;
@@ -1189,23 +1181,38 @@ https://www.frontiersin.org/journals/plant-science/articles/10.3389/fpls.2022.70
 
 ---
 
-# 26. Dashboard nên có
+# 26. Dashboard giám sát thời gian thực
 
-- Active batches
-- Total plants
-- Batches near harvest
-- Current pH
-- Current EC
-- Current DO
-- Water temperature
-- Air temperature
-- Humidity
-- Alerts
-- Water usage
-- Nutrient usage
-- Harvest history
-- Yield trend
-- AI predicted yield
+Dashboard là trung tâm điều khiển vận hành hàng ngày của trang trại, bao gồm các thành phần chuẩn hóa:
+
+### 1. 4 Thẻ chỉ số tổng quan (KPI Metric Cards)
+- **Lô đang trồng**: Số lượng lô đang trong chu kỳ canh tác thực tế (`active batches`).
+- **Tổng số cây trên máng**: Tổng cộng số cây thực tế đang sinh trưởng trên các giàn/máng thủy canh.
+- **Cảnh báo cần xử lý**: Số lượng cảnh báo chưa được giải quyết (`unresolved alerts`), đổi màu nổi bật khi có sự cố.
+- **Sản lượng dự kiến tổng hợp**: Sản lượng dự kiến toàn trang trại ($\sim\text{kg}$), được tính toán cộng dồn **động** từ mô hình AI dự báo theo từng lô và số ngày tuổi thực tế.
+
+### 2. Biểu đồ giám sát pH & EC theo chuỗi thời gian
+- Biểu đồ đường kép (Dual Line Chart) thể hiện biến thiên pH và nồng độ EC qua các ngày đo đạc.
+- Đánh dấu vùng tham chiếu an toàn chuẩn hóa cho rau xà lách (pH 5.5 - 6.2; EC 1.4 - 1.9 mS/cm).
+
+### 3. Khung thông số bể dinh dưỡng hiện hành
+- Hiển thị trực quan bộ 3 chỉ số thiết yếu: **pH, EC, Nhiệt độ nước bồn**.
+- **Thể tích dung dịch hiện tại**: Số lít dung dịch hiện có trong bể và tỷ lệ % thể tích bể chứa.
+- Trạng thái hoạt động của bơm tuần hoàn dinh dưỡng.
+- **Chú thích nông học thông minh (Smart Agronomic Tooltips)**: Mỗi chỉ số lý hóa đều có tooltip giải thích ý nghĩa nông nghiệp thực tế, dải tối ưu và lưu ý rủi ro (ví dụ: giải thích tại sao pH cần 5.6 - 6.2 để hấp thu vi lượng, rủi ro EC < 1.3 mS/cm hoặc nhiệt độ nước > 24.5°C).
+
+### 4. Thanh giám sát tiểu khí hậu thời gian thực (Microclimate Real-time Bar)
+- Cập nhật các thông số cảm biến môi trường không khí nhà màng:
+  - **Nhiệt độ phòng** (°C)
+  - **Độ ẩm không khí RH** (%)
+  - **Áp suất hơi thiếu hụt (VPD)** (kPa) kèm nhãn đánh giá trạng thái sinh học (Tối ưu / Quá khô / Quá ẩm) và tooltip giải thích cơ chế thoát hơi nước chống cháy ngọn lá (*tipburn*).
+
+### 5. Danh sách lô canh tác & Bảng tin cảnh báo nhanh
+- Bảng danh sách các lô đang trồng tích hợp **Thanh tiến trình ngày tuổi rút gọn (Compact Lifecycle Progress Bar)** hiển thị rõ ngày tuổi, % hoàn thành chu kỳ và số ngày đếm ngược đến kỳ thu hoạch.
+- Khung hiển thị các cảnh báo mới nhất kèm hành động đề xuất khắc phục tức thời.
+
+### 6. Trải nghiệm tương tác & Phản hồi thời gian thực (Toast Notifications)
+- Mọi thao tác vận hành nghiệp vụ (xác nhận châm phân, lưu số đo sinh trưởng, chuyển tiếp giai đoạn, thu hoạch, xử lý cảnh báo) đều kích hoạt thông báo Toast nổi bật góc màn hình, tạo phản hồi thị giác tin cậy cho người vận hành.
 
 ---
 
@@ -1244,7 +1251,6 @@ Kỹ sư quét QR để xem nhanh:
 - growth stage;
 - pH;
 - EC;
-- DO;
 - nhiệt độ;
 - nutrient formula;
 - observation gần nhất;
@@ -1262,7 +1268,6 @@ Có thể nhập số liệu ngay trên mobile.
 | Temperature | °C |
 | pH | không đơn vị |
 | EC | mS/cm |
-| DO | mg/L |
 | Nutrient concentration | mg/L hoặc ppm |
 | Alkalinity | mg/L CaCO3 |
 | Water volume | L |
@@ -1450,7 +1455,6 @@ Sau khi core ổn mới làm:
 
 - pH
 - EC
-- DO
 - Water Temperature
 - Air Temperature
 - Humidity
@@ -1505,7 +1509,7 @@ Crop + Cultivar + Growth Stage
 NFT / DWC + Reservoir + Channel (máng)
              ↓
 [3] NƯỚC
-pH + EC + DO + Water Temperature
+pH + EC + Water Temperature
              ↓
 [4] DINH DƯỠNG
 N P K Ca Mg S + Micronutrients
@@ -1580,7 +1584,7 @@ Nên định nghĩa rõ hơn:
 
 Đề tài cuối cùng có thể mô tả ngắn gọn như sau:
 
-> **Smart Hydroponic Farm Management System** là phần mềm số hóa hoạt động của trang trại thủy canh, quản lý cây trồng, hệ thống NFT/DWC, bể dung dịch, dinh dưỡng, pH, EC, DO, điều kiện môi trường, sinh trưởng và thu hoạch. Dữ liệu lịch sử được xử lý theo hướng Batch Processing và Machine Learning để xây dựng AI dự báo năng suất xà lách tại thời điểm thu hoạch và hỗ trợ phát hiện điều kiện bất thường. Hệ thống đóng vai trò Decision Support System cho người quản lý và kỹ sư nông nghiệp.
+> **Smart Hydroponic Farm Management System** là phần mềm số hóa hoạt động của trang trại thủy canh, quản lý cây trồng, hệ thống NFT/DWC, bể dung dịch, dinh dưỡng, pH, EC, điều kiện môi trường, sinh trưởng và thu hoạch. Dữ liệu lịch sử được xử lý theo hướng Batch Processing và Machine Learning để xây dựng AI dự báo năng suất xà lách tại thời điểm thu hoạch và hỗ trợ phát hiện điều kiện bất thường. Hệ thống đóng vai trò Decision Support System cho người quản lý và kỹ sư nông nghiệp.
 
 ---
 

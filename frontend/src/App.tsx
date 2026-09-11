@@ -10,9 +10,11 @@ import { AlertsView } from './views/AlertsView';
 import { HarvestView } from './views/HarvestView';
 import { farmStore } from './mock/store';
 import type { CropBatch } from './types/farm';
+import { useToast } from './components/Toast';
 
 export const App: React.FC = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   // State from Store
   const [batches, setBatches] = useState(() => farmStore.getBatches());
@@ -42,18 +44,21 @@ export const App: React.FC = () => {
   const handleAddBatch = (data: any) => {
     farmStore.addBatch(data);
     refreshState();
+    showToast('Tạo lô thành công', `Đã thêm lô ${data.batchCode || ''} vào máng canh tác`, 'success');
   };
 
   const handleDeleteBatch = (id: string) => {
     if (window.confirm('Bạn có chắc chắn muốn xóa lô trồng này?')) {
       farmStore.deleteBatch(id);
       refreshState();
+      showToast('Đã xóa lô', 'Lô trồng đã được loại bỏ khỏi danh sách', 'info');
     }
   };
 
   const handleAddMeasurement = (data: any) => {
     farmStore.addMeasurementRecord(data);
     refreshState();
+    showToast('Đã ghi nhận số đo', `pH ${data.ph} | EC ${data.ec} mS/cm | ${data.waterTemp}°C`, 'success');
   };
 
   const handleUpdateVolume = (resId: string, addedLiters: number) => {
@@ -67,6 +72,31 @@ export const App: React.FC = () => {
       lastTopUpDate: new Date().toISOString().split('T')[0]
     });
     refreshState();
+    showToast('Châm nước thành công', `Đã châm thêm ${addedLiters}L nước sạch vào bể`, 'info');
+  };
+
+  const handleApplyDosing = (reservoirId: string, targetEc: number, doseMl: number) => {
+    farmStore.applyDosing(reservoirId, targetEc, doseMl);
+    refreshState();
+    showToast('Châm dinh dưỡng thành công', `Đã châm ${doseMl}ml Can A & B. EC bồn đạt ${targetEc} mS/cm.`, 'success');
+  };
+
+  const handleAddObservation = (batchId: string, obs: any) => {
+    farmStore.addBatchObservation(batchId, obs);
+    refreshState();
+    showToast('Đã lưu đo đạc sinh trưởng', `${obs.avgLeafCount} lá | ${obs.avgHeightCm} cm | mẫu ${obs.sampleWeightG}g`, 'success');
+  };
+
+  const handleAdvanceStage = (batchId: string, newStage: any) => {
+    farmStore.advanceBatchStage(batchId, newStage);
+    refreshState();
+    const stageNames: Record<string, string> = {
+      seedling: 'Cây con',
+      vegetative: 'Sinh dưỡng',
+      pre_harvest: 'Sắp thu hoạch',
+      harvested: 'Đã thu hoạch'
+    };
+    showToast('Chuyển giai đoạn', `Lô đã chuyển sang: ${stageNames[newStage] || newStage}`, 'info');
   };
 
   const handleResolveAlert = (id: string, by?: string, note?: string) => {
@@ -82,11 +112,13 @@ export const App: React.FC = () => {
   const handleDrainReservoir = (event: any) => {
     farmStore.addDrainEvent(event);
     refreshState();
+    showToast('Đã xử lý cảnh báo', 'Cảnh báo đã được đánh dấu hoàn thành', 'success');
   };
 
   const handleRecordHarvest = (data: any) => {
     farmStore.recordHarvest(data);
     refreshState();
+    showToast('Thu hoạch hoàn tất', `Ghi nhận ${data.totalWeightKg}kg thành phẩm cho lô ${data.batchCode}`, 'success');
   };
 
   const handleResetData = () => {
@@ -144,6 +176,8 @@ export const App: React.FC = () => {
                   onAddBatch={handleAddBatch}
                   onDeleteBatch={handleDeleteBatch}
                   onSelectBatchForAI={handleSelectBatchForAI}
+                  onAddObservation={handleAddObservation}
+                  onAdvanceStage={handleAdvanceStage}
                 />
               }
             />

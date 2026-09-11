@@ -13,7 +13,6 @@ export const INITIAL_CULTIVARS: Cultivar[] = [
     recommendedPhMax: 6.2,
     recommendedEcMin: 1.4,
     recommendedEcMax: 1.9,
-    minDo: 6.0,
     optimalWaterTempMin: 20.0,
     optimalWaterTempMax: 24.0,
   },
@@ -29,7 +28,6 @@ export const INITIAL_CULTIVARS: Cultivar[] = [
     recommendedPhMax: 6.3,
     recommendedEcMin: 1.5,
     recommendedEcMax: 2.0,
-    minDo: 6.2,
     optimalWaterTempMin: 21.0,
     optimalWaterTempMax: 25.0,
   },
@@ -45,7 +43,6 @@ export const INITIAL_CULTIVARS: Cultivar[] = [
     recommendedPhMax: 6.0,
     recommendedEcMin: 1.6,
     recommendedEcMax: 2.1,
-    minDo: 6.5,
     optimalWaterTempMin: 19.0,
     optimalWaterTempMax: 23.5,
   }
@@ -60,7 +57,6 @@ export const INITIAL_RESERVOIRS: Reservoir[] = [
     currentVolumeLiters: 540,
     currentPh: 5.85,
     currentEc: 1.72,
-    currentDo: 6.75,
     currentWaterTemp: 22.4,
     formulaName: 'Chuẩn Hoagland - Resh Xà Lách Thủy Canh (NFT Sinh Trưởng)',
     lastTopUpDate: '2026-09-09',
@@ -76,7 +72,6 @@ export const INITIAL_RESERVOIRS: Reservoir[] = [
     currentVolumeLiters: 920,
     currentPh: 6.02,
     currentEc: 1.84,
-    currentDo: 7.20,
     currentWaterTemp: 21.8,
     formulaName: 'Chuẩn Hoagland - Resh Xà Lách Thủy Canh (NFT Sinh Trưởng)',
     lastTopUpDate: '2026-09-08',
@@ -223,19 +218,19 @@ export const INITIAL_BATCHES: CropBatch[] = [
 
 // 7 days time series records for charting
 export const INITIAL_SENSOR_HISTORY = [
-  { day: '04/09', time: '08:00', ph: 5.75, ec: 1.62, doLevel: 6.9, waterTemp: 22.0, airTemp: 26.5, humidity: 68, vpd: 1.08 },
-  { day: '04/09', time: '14:00', ph: 5.82, ec: 1.68, doLevel: 6.6, waterTemp: 23.2, airTemp: 29.8, humidity: 62, vpd: 1.58 },
-  { day: '05/09', time: '08:00', ph: 5.80, ec: 1.66, doLevel: 6.8, waterTemp: 22.1, airTemp: 26.0, humidity: 70, vpd: 1.01 },
-  { day: '05/09', time: '14:00', ph: 5.91, ec: 1.74, doLevel: 6.5, waterTemp: 23.5, airTemp: 30.2, humidity: 60, vpd: 1.71 },
-  { day: '06/09', time: '08:00', ph: 5.85, ec: 1.70, doLevel: 6.7, waterTemp: 22.3, airTemp: 26.8, humidity: 67, vpd: 1.16 },
-  { day: '06/09', time: '14:00', ph: 5.98, ec: 1.82, doLevel: 6.4, waterTemp: 23.8, airTemp: 30.8, humidity: 58, vpd: 1.87 },
-  { day: '07/09', time: '08:00', ph: 5.88, ec: 1.75, doLevel: 6.6, waterTemp: 22.2, airTemp: 26.2, humidity: 69, vpd: 1.05 },
-  { day: '07/09', time: '14:00', ph: 6.02, ec: 1.88, doLevel: 6.3, waterTemp: 24.1, airTemp: 31.0, humidity: 59, vpd: 1.84 },
-  { day: '08/09', time: '08:00', ph: 5.84, ec: 1.72, doLevel: 6.8, waterTemp: 22.0, airTemp: 25.8, humidity: 71, vpd: 0.96 },
-  { day: '08/09', time: '14:00', ph: 5.90, ec: 1.76, doLevel: 6.6, waterTemp: 23.0, airTemp: 29.5, humidity: 64, vpd: 1.48 },
-  { day: '09/09', time: '08:00', ph: 5.82, ec: 1.69, doLevel: 6.8, waterTemp: 22.2, airTemp: 26.0, humidity: 70, vpd: 1.01 },
-  { day: '09/09', time: '14:00', ph: 5.89, ec: 1.74, doLevel: 6.7, waterTemp: 22.8, airTemp: 29.0, humidity: 65, vpd: 1.40 },
-  { day: '10/09', time: '08:00', ph: 5.85, ec: 1.72, doLevel: 6.75, waterTemp: 22.4, airTemp: 26.4, humidity: 68, vpd: 1.10 }
+  { day: '04/09', time: '08:00', ph: 5.75, ec: 1.62, waterTemp: 22.0, airTemp: 26.5, humidity: 68, vpd: 1.08 },
+  { day: '04/09', time: '14:00', ph: 5.82, ec: 1.68, waterTemp: 23.2, airTemp: 29.8, humidity: 62, vpd: 1.58 },
+  { day: '05/09', time: '08:00', ph: 5.80, ec: 1.66, waterTemp: 22.1, airTemp: 26.0, humidity: 70, vpd: 1.01 },
+  { day: '05/09', time: '14:00', ph: 5.91, ec: 1.74, waterTemp: 23.5, airTemp: 30.2, humidity: 60, vpd: 1.71 },
+  { day: '06/09', time: '08:00', ph: 5.85, ec: 1.70, waterTemp: 22.3, airTemp: 26.8, humidity: 67, vpd: 1.16 },
+  { day: '06/09', time: '14:00', ph: 5.98, ec: 1.82, waterTemp: 23.8, airTemp: 30.8, humidity: 58, vpd: 1.87 },
+  { day: '07/09', time: '08:00', ph: 5.88, ec: 1.75, waterTemp: 22.2, airTemp: 26.2, humidity: 69, vpd: 1.05 },
+  { day: '07/09', time: '14:00', ph: 6.02, ec: 1.88, waterTemp: 24.1, airTemp: 31.0, humidity: 59, vpd: 1.84 },
+  { day: '08/09', time: '08:00', ph: 5.84, ec: 1.72, waterTemp: 22.0, airTemp: 25.8, humidity: 71, vpd: 0.96 },
+  { day: '08/09', time: '14:00', ph: 5.90, ec: 1.76, waterTemp: 23.0, airTemp: 29.5, humidity: 64, vpd: 1.48 },
+  { day: '09/09', time: '08:00', ph: 5.82, ec: 1.69, waterTemp: 22.2, airTemp: 26.0, humidity: 70, vpd: 1.01 },
+  { day: '09/09', time: '14:00', ph: 5.89, ec: 1.74, waterTemp: 22.8, airTemp: 29.0, humidity: 65, vpd: 1.40 },
+  { day: '10/09', time: '08:00', ph: 5.85, ec: 1.72, waterTemp: 22.4, airTemp: 26.4, humidity: 68, vpd: 1.10 }
 ];
 
 export const INITIAL_ALERTS: Alert[] = [

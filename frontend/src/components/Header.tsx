@@ -21,7 +21,7 @@ const ROUTE_TITLES: Record<string, { title: string; subtitle: string }> = {
   },
   '/reservoirs': {
     title: 'Bể nước & Dinh dưỡng',
-    subtitle: 'Kiểm tra độ pH, nồng độ dinh dưỡng EC, oxy hòa tan DO và công thức Stock A/B'
+    subtitle: 'Kiểm tra độ pH, nồng độ dinh dưỡng EC, nhiệt độ nước và công thức Stock A/B'
   },
   '/forecast': {
     title: 'Dự báo sản lượng thu hoạch',
@@ -29,7 +29,7 @@ const ROUTE_TITLES: Record<string, { title: string; subtitle: string }> = {
   },
   '/alerts': {
     title: 'Danh sách cảnh báo',
-    subtitle: 'Thông báo các chỉ số pH, EC, DO lệch ngưỡng cần xử lý'
+    subtitle: 'Thông báo các chỉ số pH, EC, nhiệt độ nước lệch ngưỡng cần xử lý'
   },
   '/harvest': {
     title: 'Nhật ký thu hoạch',
