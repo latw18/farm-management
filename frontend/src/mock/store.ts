@@ -1,4 +1,4 @@
-import type { CropBatch, Reservoir, Cultivar, NutrientFormula, Alert, HarvestRecord } from '../types/farm';
+import type { CropBatch, Reservoir, Cultivar, NutrientFormula, Alert, HarvestRecord, GrowthStage } from '../types/farm';
 import { 
   INITIAL_BATCHES, 
   INITIAL_RESERVOIRS, 
@@ -65,11 +65,17 @@ export const farmStore = {
     return updated;
   },
 
-  addMeasurementRecord: (data: { reservoirId: string; ph: number; ec: number; doLevel: number; waterTemp: number }): void => {
+  applyDosing: (reservoirId: string, targetEc: number, _doseMl: number): void => {
+    farmStore.updateReservoir(reservoirId, {
+      currentEc: targetEc,
+      lastTopUpDate: new Date().toISOString().split('T')[0]
+    });
+  },
+
+  addMeasurementRecord: (data: { reservoirId: string; ph: number; ec: number; waterTemp: number }): void => {
     farmStore.updateReservoir(data.reservoirId, {
       currentPh: data.ph,
       currentEc: data.ec,
-      currentDo: data.doLevel,
       currentWaterTemp: data.waterTemp
     });
 
@@ -84,7 +90,6 @@ export const farmStore = {
       time: timeStr,
       ph: data.ph,
       ec: data.ec,
-      doLevel: data.doLevel,
       waterTemp: data.waterTemp,
       airTemp: 27.5,
       humidity: 65,
@@ -113,16 +118,25 @@ export const farmStore = {
         reservoirId: data.reservoirId,
         suggestedAction: 'Bổ sung nước sạch vào bể để pha loãng dung dịch về ngưỡng 1.6 - 1.8 mS/cm.'
       });
+    } else if (data.ec < 1.3) {
+      farmStore.addAlert({
+        severity: data.ec < 1.0 ? 'critical' : 'warning',
+        metric: 'EC',
+        title: `EC quá loãng (${data.ec} mS/cm) tại Bể`,
+        message: `Nồng độ dinh dưỡng tụt sâu dưới ngưỡng khuyến nghị (1.5 - 1.8 mS/cm). Cây có nguy cơ suy dinh dưỡng và chậm lớn.`,
+        reservoirId: data.reservoirId,
+        suggestedAction: 'Châm thêm dung dịch Stock A và Stock B theo định lượng để đưa EC về mức tối ưu.'
+      });
     }
 
-    if (data.doLevel < 6.0) {
+    if (data.waterTemp > 24.5) {
       farmStore.addAlert({
-        severity: data.doLevel < 5.0 ? 'critical' : 'warning',
-        metric: 'DO',
-        title: `Oxy hòa tan (DO) thấp (${data.doLevel} mg/L)`,
-        message: `DO dưới ngưỡng 6.0 mg/L gây nghẹt rễ và tạo điều kiện cho nấm Pythium phát triển gây thối rễ.`,
+        severity: data.waterTemp > 26.0 ? 'critical' : 'warning',
+        metric: 'Temp',
+        title: `Nhiệt độ nước bồn tăng cao (${data.waterTemp}°C)`,
+        message: `Nhiệt độ nước vượt ngưỡng 24.5°C làm tăng nguy cơ sốc nhiệt vùng rễ và kích thích nấm hại phát triển.`,
         reservoirId: data.reservoirId,
-        suggestedAction: 'Kiểm tra máy sục khí (air pump), sục bọt khí mịn và kiểm tra nhiệt độ nước.'
+        suggestedAction: 'Bật quạt làm mát phòng hoặc bổ sung nước sạch mát hạ nhiệt bồn chứa.'
       });
     }
   },
@@ -154,6 +168,25 @@ export const farmStore = {
     const updated = list.map(b => b.id === id ? { ...b, ...updates } : b);
     setStorage(STORAGE_KEYS.BATCHES, updated);
     return updated;
+  },
+
+  addBatchObservation: (batchId: string, obs: { avgLeafCount: number; avgHeightCm: number; sampleWeightG: number; notes?: string }): CropBatch[] => {
+    const now = new Date().toISOString().split('T')[0];
+    return farmStore.updateBatch(batchId, {
+      lastObservation: {
+        date: now,
+        avgLeafCount: obs.avgLeafCount,
+        avgHeightCm: obs.avgHeightCm,
+        sampleWeightG: obs.sampleWeightG,
+        notes: obs.notes
+      }
+    });
+  },
+
+  advanceBatchStage: (batchId: string, newStage: GrowthStage): CropBatch[] => {
+    return farmStore.updateBatch(batchId, {
+      currentStage: newStage
+    });
   },
 
   deleteBatch: (id: string): CropBatch[] => {
@@ -189,6 +222,20 @@ export const farmStore = {
     const now = new Date();
     const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
     
+    // De-duplicate if unresolved alert exists for same reservoir & metric
+    const existingIndex = list.findIndex(
+      a => !a.resolved && a.metric === alertData.metric && a.reservoirId === alertData.reservoirId
+    );
+    if (existingIndex !== -1) {
+      list[existingIndex] = {
+        ...list[existingIndex],
+        ...alertData,
+        timestamp: timeStr
+      };
+      setStorage(STORAGE_KEYS.ALERTS, list);
+      return list[existingIndex];
+    }
+
     const newAlert: Alert = {
       ...alertData,
       id: `alt-${Date.now()}`,
@@ -229,9 +276,10 @@ export const farmStore = {
     const updated = [newRecord, ...list];
     setStorage(STORAGE_KEYS.HARVESTS, updated);
 
-    // Update batch status to harvested
+    // Update batch status to harvested and stage to harvest
     farmStore.updateBatch(harvestData.batchId, {
       status: 'harvested',
+      currentStage: 'harvest',
       actualHarvestDate: harvestData.harvestDate
     });
 

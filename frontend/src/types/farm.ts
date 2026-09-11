@@ -16,7 +16,7 @@ export type BatchStatus = 'active' | 'harvested' | 'failed';
 
 export type AlertSeverity = 'critical' | 'warning' | 'info';
 
-export type AlertMetric = 'pH' | 'EC' | 'DO' | 'Temp' | 'Nutrient' | 'System';
+export type AlertMetric = 'pH' | 'EC' | 'Temp' | 'Nutrient' | 'System';
 
 export interface Cultivar {
   id: string;
@@ -30,7 +30,6 @@ export interface Cultivar {
   recommendedPhMax: number;
   recommendedEcMin: number;
   recommendedEcMax: number;
-  minDo: number;
   optimalWaterTempMin: number;
   optimalWaterTempMax: number;
 }
@@ -59,7 +58,18 @@ export interface CropBatch {
     avgLeafCount: number;
     avgHeightCm: number;
     sampleWeightG: number;
+    notes?: string;
   };
+}
+
+export interface CropObservation {
+  id: string;
+  batchId: string;
+  date: string;
+  avgLeafCount: number;
+  avgHeightCm: number;
+  sampleWeightG: number;
+  notes?: string;
 }
 
 export interface Reservoir {
@@ -70,7 +80,6 @@ export interface Reservoir {
   currentVolumeLiters: number;
   currentPh: number;
   currentEc: number; // mS/cm
-  currentDo: number; // mg/L or ppm
   currentWaterTemp: number; // °C
   formulaName: string;
   lastTopUpDate: string;
@@ -119,7 +128,6 @@ export interface WaterQualityRecord {
   timestamp: string;
   ph: number;
   ec: number;
-  doLevel: number;
   waterTemp: number;
   recordedBy: string;
   source: 'manual' | 'sensor';

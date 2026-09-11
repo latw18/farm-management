@@ -172,10 +172,13 @@ export const AIPredictorView: React.FC<AIPredictorViewProps> = ({
     plants = expectedPlants
   ) => {
     if (!batch) return;
+    const cult = cultivars.find(c => c.id === batch.cultivarId);
     const res = predictLettuceYield({
       batchId: batch.id,
       batchCode: batch.batchCode,
       cultivarName: batch.cultivarName,
+      targetCycleDays: cult?.targetCycleDays || 35,
+      expectedWeightG: cult?.expectedWeightG || 200,
       plantAgeDays: age,
       leafCount: leaves,
       plantHeightCm: height,

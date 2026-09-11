@@ -3,7 +3,8 @@ import {
   Sprout, 
   Droplets, 
   AlertTriangle, 
-  TrendingUp
+  TrendingUp,
+  CloudSun
 } from 'lucide-react';
 import { 
   ResponsiveContainer, 
@@ -12,10 +13,13 @@ import {
   XAxis, 
   YAxis, 
   Tooltip, 
-  CartesianGrid, 
-  ReferenceArea 
+  CartesianGrid,
+  ReferenceArea
 } from 'recharts';
 import type { CropBatch, Reservoir, Alert } from '../types/farm';
+import { predictLettuceYield } from '../services/aiPredictor';
+import { AgronomicTooltip } from '../components/AgronomicTooltip';
+import { LifecycleProgressBar } from '../components/LifecycleProgressBar';
 
 interface DashboardViewProps {
   batches: CropBatch[];
@@ -37,6 +41,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const activeBatches = batches.filter(b => b.status === 'active');
   const totalPlants = activeBatches.reduce((sum, b) => sum + b.currentQuantity, 0);
   const unreadAlerts = alerts.filter(a => !a.resolved);
+
+  // Dynamic predicted yield calculation using predictLettuceYield
+  const totalPredictedYieldKg = activeBatches.reduce((sum, b) => {
+    const ageDays = Math.max(1, Math.round((new Date().getTime() - new Date(b.seedDate).getTime()) / (1000 * 3600 * 24)));
+    const res = reservoirs.find(r => r.id === b.reservoirId) || reservoirs[0];
+    const pred = predictLettuceYield({
+      cultivarName: b.cultivarName,
+      plantAgeDays: ageDays,
+      targetCycleDays: 35,
+      expectedWeightG: 190,
+      leafCount: b.lastObservation?.avgLeafCount || (ageDays > 20 ? 14 : 8),
+      plantHeightCm: b.lastObservation?.avgHeightCm || (ageDays > 20 ? 14 : 8),
+      avgEc: res?.currentEc || 1.6,
+      avgPh: res?.currentPh || 5.85,
+      avgWaterTemp: res?.currentWaterTemp || 22.5,
+      expectedPlants: b.currentQuantity
+    });
+    return sum + (pred.totalBatchYieldKg || 0);
+  }, 0);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -92,7 +115,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div>
             <div className="kpi-label">Sản lượng dự kiến</div>
             <div className="kpi-value">
-              ~380 <span style={{ fontSize: '0.8125rem', fontWeight: 400, color: 'var(--text-muted)' }}>kg</span>
+              ~{Math.round(totalPredictedYieldKg || 380)} <span style={{ fontSize: '0.8125rem', fontWeight: 400, color: 'var(--text-muted)' }}>kg</span>
             </div>
           </div>
         </div>
@@ -201,7 +224,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             <div style={{ backgroundColor: 'var(--bg-subtle)', padding: '12px', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Độ pH</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Độ pH</span>
+                <AgronomicTooltip 
+                  title="Độ pH dung dịch dinh dưỡng" 
+                  optimalRange="5.5 - 6.2" 
+                  explanation="Độ pH quyết định khả năng hòa tan và hấp thu các ion khoáng của rễ xà lách. Nếu pH lệch chuẩn, cây sẽ bị đói vi lượng dù phân bón đầy đủ."
+                  warningNotice="pH > 6.5 dễ gây vàng lá (thiếu sắt); pH < 5.0 làm tổn thương lông hút của rễ."
+                />
+              </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--primary-700)', marginTop: '2px' }}>
                 {reservoirs[0]?.currentPh ?? 5.85}
               </div>
@@ -209,7 +240,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div style={{ backgroundColor: 'var(--bg-subtle)', padding: '12px', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Nồng độ EC</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Nồng độ EC</span>
+                <AgronomicTooltip 
+                  title="Độ dẫn điện EC (Nồng độ muối khoáng)" 
+                  optimalRange="1.4 - 1.9 mS/cm" 
+                  explanation="EC phản ánh tổng lượng phân bón khoáng hòa tan trong bể (N, P, K, Ca, Mg,...). Nồng độ ổn định giúp búp xà lách cuốn chặt, giòn ngọt."
+                  warningNotice="EC < 1.3 mS/cm cây chậm lớn; EC > 2.2 mS/cm làm cháy mép lá và ngộ độc rễ."
+                />
+              </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--info-text)', marginTop: '2px' }}>
                 {reservoirs[0]?.currentEc ?? 1.72} <span style={{ fontSize: '0.75rem', fontWeight: 400 }}>mS/cm</span>
               </div>
@@ -217,15 +256,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div style={{ backgroundColor: 'var(--bg-subtle)', padding: '12px', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Oxy hòa tan (DO)</div>
-              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
-                {reservoirs[0]?.currentDo ?? 6.75} <span style={{ fontSize: '0.75rem', fontWeight: 400 }}>mg/L</span>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Dung tích bể</span>
+                <AgronomicTooltip 
+                  title="Mực nước & Thể tích bể" 
+                  explanation="Lượng nước dinh dưỡng hiện tại trong bồn chứa. Đảm bảo lượng nước trên 50% dung tích để máy bơm tuần hoàn màng NFT luôn ổn định, tránh hụt nước khi nắng to."
+                />
               </div>
-              <div style={{ fontSize: '0.7rem', color: 'var(--success-text)' }}>Tốt (&gt; 6.0)</div>
+              <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
+                {reservoirs[0]?.currentVolumeLiters ?? 1800} <span style={{ fontSize: '0.75rem', fontWeight: 400 }}>/ {reservoirs[0]?.capacityLiters ?? 2000}L</span>
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--primary-700)' }}>
+                {Math.round(((reservoirs[0]?.currentVolumeLiters ?? 1800) / (reservoirs[0]?.capacityLiters ?? 2000)) * 100)}% thể tích
+              </div>
             </div>
 
             <div style={{ backgroundColor: 'var(--bg-subtle)', padding: '12px', borderRadius: 'var(--radius-md)' }}>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Nhiệt độ nước</div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Nhiệt độ nước</span>
+                <AgronomicTooltip 
+                  title="Nhiệt độ nước bồn chứa" 
+                  optimalRange="20 - 24°C" 
+                  explanation="Nhiệt độ dung dịch mát mẻ kích thích bộ rễ phát triển màu trắng tinh khiết, rễ hút khoáng mạnh mẽ."
+                  warningNotice="Nước ấm > 24.5°C làm tăng nguy cơ nấm bệnh Pythium bùng phát gây thối rễ."
+                />
+              </div>
               <div style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>
                 {reservoirs[0]?.currentWaterTemp ?? 22.4}°C
               </div>
@@ -234,7 +289,52 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
 
           <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '10px', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
-            Mực nước bể: <strong>{reservoirs[0]?.currentVolumeLiters}L</strong> / {reservoirs[0]?.capacityLiters}L
+            Hệ thống cấp: <strong>NFT Chảy màng dinh dưỡng</strong> | Bơm tuần hoàn: <span style={{ color: 'var(--success-text)', fontWeight: 600 }}>Đang chạy</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Microclimate Real-time Bar */}
+      <div className="clean-card" style={{ padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', background: 'linear-gradient(to right, #f8fafc, #f0fdf4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--primary-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--primary-700)' }}>
+            <CloudSun size={18} />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-main)' }}>Tiểu khí hậu nhà màng A</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Cập nhật cảm biến môi trường thời gian thực</div>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Nhiệt độ phòng:</span>
+            <strong style={{ fontSize: '0.875rem', color: 'var(--text-main)' }}>23.8°C</strong>
+            <AgronomicTooltip 
+              title="Nhiệt độ không khí" 
+              optimalRange="20 - 25°C" 
+              explanation="Nhiệt độ lý tưởng cho quá trình quang hợp của xà lách. Nhiệt độ trên 28°C dễ làm rau đắng và vống ngọn." 
+            />
+          </div>
+          <div style={{ height: '16px', width: '1px', backgroundColor: 'var(--border-subtle)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Độ ẩm RH:</span>
+            <strong style={{ fontSize: '0.875rem', color: 'var(--text-main)' }}>68%</strong>
+            <AgronomicTooltip 
+              title="Độ ẩm tương đối (RH)" 
+              optimalRange="60 - 75%" 
+              explanation="Độ ẩm vừa phải giúp lá mở khí khổng để trao đổi CO2 tốt. Độ ẩm >85% dễ sinh nấm mốc xám Botrytis." 
+            />
+          </div>
+          <div style={{ height: '16px', width: '1px', backgroundColor: 'var(--border-subtle)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-subtle)' }}>Áp suất thiếu hụt (VPD):</span>
+            <strong style={{ fontSize: '0.875rem', color: 'var(--primary-700)' }}>0.92 kPa</strong>
+            <span className="badge badge-success" style={{ fontSize: '0.7rem' }}>Tối ưu</span>
+            <AgronomicTooltip 
+              title="Áp suất hơi thiếu hụt VPD (Vapor Pressure Deficit)" 
+              optimalRange="0.8 - 1.2 kPa" 
+              explanation="Chỉ số phản ánh sức hút thoát hơi nước của lá. Dải 0.8 - 1.2 kPa giúp xà lách vận chuyển Canxi lên ngọn lá hoàn hảo, ngăn chặn triệt để hiện tượng cháy mép lá (tipburn)." 
+            />
           </div>
         </div>
       </div>
@@ -263,7 +363,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <th>Giống xà lách</th>
                   <th>Hệ thống</th>
                   <th>Số cây</th>
-                  <th>Giai đoạn</th>
+                  <th>Tiến trình ngày tuổi</th>
                   <th>Thao tác</th>
                 </tr>
               </thead>
@@ -274,12 +374,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <td style={{ fontWeight: 500 }}>{batch.cultivarName}</td>
                     <td><span className="badge badge-neutral">{batch.systemType}</span></td>
                     <td>{batch.currentQuantity} cây</td>
-                    <td>
-                      <span className="badge badge-success">
-                        {batch.currentStage === 'vegetative' ? 'Sinh dưỡng' : 
-                         batch.currentStage === 'seedling' ? 'Cây con' : 
-                         batch.currentStage === 'pre_harvest' ? 'Sắp thu hoạch' : batch.currentStage}
-                      </span>
+                    <td style={{ minWidth: '150px' }}>
+                      <LifecycleProgressBar 
+                        compact 
+                        seedDate={batch.seedDate} 
+                        expectedHarvestDate={batch.expectedHarvestDate}
+                        currentStage={batch.currentStage}
+                        targetCycleDays={35}
+                      />
                     </td>
                     <td>
                       <button
