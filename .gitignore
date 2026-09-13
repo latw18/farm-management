@@ -45,3 +45,7 @@ logs
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Private workspace docs & agent files (kept externally in workspace root)
+docs/
+AGENTS.md
