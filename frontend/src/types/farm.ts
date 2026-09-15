@@ -83,6 +83,7 @@ export interface Reservoir {
   currentPh: number;
   currentEc: number; // mS/cm
   currentWaterTemp: number; // °C
+  currentDo?: number; // mg/L
   formulaName: string;
   lastTopUpDate: string;
   lastReplacementDate: string;

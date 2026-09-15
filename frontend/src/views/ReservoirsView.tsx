@@ -11,6 +11,7 @@ import {
   History
 } from 'lucide-react';
 import type { Reservoir, NutrientFormula, Channel, SolutionDrainEvent, CropBatch } from '../types/farm';
+import { AgronomicTooltip } from '../components/AgronomicTooltip';
 
 interface ReservoirsViewProps {
   reservoirs: Reservoir[];
@@ -18,9 +19,10 @@ interface ReservoirsViewProps {
   channels: Channel[];
   batches: CropBatch[];
   drainEvents: SolutionDrainEvent[];
-  onAddMeasurement: (data: { reservoirId: string; ph: number; ec: number; doLevel: number; waterTemp: number }) => void;
+  onAddMeasurement: (data: { reservoirId: string; ph: number; ec: number; waterTemp: number; doLevel?: number }) => void;
   onUpdateVolume: (reservoirId: string, addedLiters: number) => void;
   onDrainReservoir: (event: Omit<SolutionDrainEvent, 'id'>) => void;
+  onApplyDosing?: (reservoirId: string, targetEc: number, doseMl: number) => void;
 }
 
 export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
@@ -31,7 +33,8 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
   drainEvents = [],
   onAddMeasurement,
   onUpdateVolume,
-  onDrainReservoir
+  onDrainReservoir,
+  onApplyDosing
 }) => {
   const [selectedResId, setSelectedResId] = useState<string>(reservoirs[0]?.id || '');
   const [selectedFormulaId, setSelectedFormulaId] = useState<string>(formulas[0]?.id || '');
@@ -39,6 +42,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
   const [isTopUpModalOpen, setIsTopUpModalOpen] = useState(false);
   const [isDrainModalOpen, setIsDrainModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'dosing' | 'channels' | 'history'>('dosing');
+  const [dosingSuccessMsg, setDosingSuccessMsg] = useState<string | null>(null);
 
   // Selected reservoir & formula
   const selectedRes = reservoirs.find(r => r.id === selectedResId) || reservoirs[0];
@@ -62,7 +66,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
   const resDrainHistory = drainEvents.filter(e => e.reservoirId === selectedResId);
 
   // Calculator State
-  const [calcTargetEc, setCalcTargetEc] = useState<number>(1.70);
+  const [calcTargetEc, setCalcTargetEc] = useState<number>(activeFormula ? activeFormula.targetEc : 1.75);
   const [calcMode, setCalcMode] = useState<'topup' | 'new_tank'>('topup');
 
   // Sync state when selected reservoir changes
@@ -76,7 +80,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
 
   useEffect(() => {
     if (activeFormula) {
-      setTargetEc(activeFormula.targetEc);
+      setCalcTargetEc(activeFormula.targetEc);
     }
   }, [selectedFormulaId]);
 
@@ -90,17 +94,14 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
 
   // Dosing calculation:
   // Empirical rule: 10ml of Stock A + 10ml of Stock B per 100L increases EC by approx 0.10 mS/cm
-  const ecDeficit = Math.max(0, targetEc - selectedRes.currentEc);
+  const ecDeficit = Math.max(0, calcTargetEc - selectedRes.currentEc);
   const dosingRatioFactor = (selectedRes.currentVolumeLiters / 100);
   const recommendedDoseMlPerStock = Math.round((ecDeficit / 0.10) * 10 * dosingRatioFactor);
 
   // Aliases for UI compatibility
-  const calcTargetEc = targetEc;
-  const setCalcTargetEc = setTargetEc;
   const calcDeltaEc = ecDeficit;
   const calculatedDoseMl = recommendedDoseMlPerStock;
   const calculatedDoseLiters = (calculatedDoseMl / 1000).toFixed(2);
-  const [calcMode, setCalcMode] = useState<'topup' | 'new_tank'>('topup');
 
   const handleLogSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -128,7 +129,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
       volumeDrainedLiters: selectedRes.currentVolumeLiters,
       finalPh: selectedRes.currentPh,
       finalEc: selectedRes.currentEc,
-      finalDo: selectedRes.currentDo,
+      finalDo: selectedRes.currentDo ?? 6.5,
       reason: drainReason,
       operator: drainOperator,
       notes: drainNotes
@@ -137,13 +138,15 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
     setDrainNotes('');
   };
 
-  if (!selectedRes) {
-    return (
-      <div className="clean-card" style={{ textAlign: 'center', padding: '40px 20px' }}>
-        <p>Chưa có bể dinh dưỡng nào được thiết lập.</p>
-      </div>
-    );
-  }
+  const handleConfirmDosing = () => {
+    if (onApplyDosing && recommendedDoseMlPerStock > 0) {
+      onApplyDosing(selectedRes.id, calcTargetEc, recommendedDoseMlPerStock);
+      setDosingSuccessMsg(`Đã xác nhận châm ${recommendedDoseMlPerStock}ml Can A và Can B vào ${selectedRes.name.split('-')[0].trim()}! Nồng độ EC đã được cập nhật đạt chuẩn.`);
+      setTimeout(() => setDosingSuccessMsg(null), 5000);
+    }
+  };
+
+  const handleExecuteDosing = handleConfirmDosing;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -943,7 +946,7 @@ export const ReservoirsView: React.FC<ReservoirsViewProps> = ({
                   </div>
                   <div>
                     <div style={{ fontSize: '0.7rem', color: 'var(--text-subtle)' }}>DO cuối (mg/L)</div>
-                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{selectedRes.currentDo.toFixed(2)}</div>
+                    <div style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>{(selectedRes.currentDo ?? 6.5).toFixed(2)}</div>
                   </div>
                 </div>
 

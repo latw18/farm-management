@@ -193,6 +193,7 @@ export const App: React.FC = () => {
                   onAddMeasurement={handleAddMeasurement}
                   onUpdateVolume={handleUpdateVolume}
                   onDrainReservoir={handleDrainReservoir}
+                  onApplyDosing={handleApplyDosing}
                 />
               }
             />

@@ -1,4 +1,4 @@
-import type { CropBatch, Reservoir, Cultivar, NutrientFormula, Alert, HarvestRecord, Channel, SolutionDrainEvent } from '../types/farm';
+import type { CropBatch, Reservoir, Cultivar, NutrientFormula, Alert, HarvestRecord, Channel, SolutionDrainEvent, GrowthStage } from '../types/farm';
 import { 
   INITIAL_BATCHES, 
   INITIAL_RESERVOIRS, 
